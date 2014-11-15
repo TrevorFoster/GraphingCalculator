@@ -1,6 +1,6 @@
-import sys, os
-
-sys.path.insert(0, os.path.abspath(os.path.join(sys.path[0], os.pardir)) + "/lib")
+import sys
+from CLineReadFile import relativePath
+sys.path.insert(0, relativePath(sys.path[0], 1, "/lib"))
 try:
 	import pyglet
 except ImportError:
@@ -29,7 +29,6 @@ def trace(func, domain, center, zoom):
 	return graph
 
 def drawGraph(coords):
-	print len(coords)
 	pyglet.graphics.draw(len(coords) / 2, pyglet.gl.GL_LINE_STRIP,
 		('v2f', coords),
 		('c4f', ((1, .25, .25, 0) * (len(coords) / 2)))

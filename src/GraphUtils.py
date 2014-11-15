@@ -1,4 +1,5 @@
 import re
+from MathCalc import bindings
 
 def frange(start, stop, step):
 	vals = []
@@ -14,17 +15,16 @@ def formatExpression(func):
 	# Attempts to format multiplication in the expression properly
 	# so that it may be successfully evaluated
 	def fixMultiplication(func):
-		result = re.sub(r"(\b[0-9]+(?:\.[0-9]+)?) *(?=[A-Za-z]+)", lambda match: match.group() + "*", func)
-
-		return re.sub(r"\) *[\w(]", lambda match: "%s*%s"  % (match.group()[0], match.group()[1:]), result)
+		result = re.sub(r"(\b[0-9]+(?:\.[0-9]+)?) *([A-Za-z]+)", lambda match: "%s*%s" % (match.group(1), match.group(2)), func)
+		result = re.sub(r"\) *[\w(]", lambda match: "%s*%s"  % (match.group()[0], match.group()[1:]), result)
+		result = re.sub(r"([A-Za-z]+)(%s)" % FUNCREGEX, lambda match: "%s*%s" % (match.group(1), match.group(2)), result)
+		print result
+		return result
 
 	# Attempts to format exponents in the expression properly
 	# so that it may be successfully evaluated
 	def replaceExp(func):
 		return re.sub(r"\^+", "**", func)
-
-	def replaceLn(func):
-		return re.sub(r"(?i)ln", "log", func)
 
 	# Removes dependant variable from expression if it contains
 	# a dependant variable
@@ -60,16 +60,13 @@ def formatExpression(func):
 	return fixOpening(
 		removeDependant(
 			replaceExp(
-				replaceLn(
 					fixMultiplication(func)
-					)
 				)
 			)
 		)
 
 def findIndependent(func):
-	varsFound = list(set(filter(lambda word: not word in funcList,
-									 re.findall("[A-Za-z]\w*", func))))
+	varsFound = list(set(filter(lambda word: not word in funcList, re.findall("[A-Za-z]\w*", func))))
 
 	if len(varsFound) == 1:
 		return varsFound[0]
@@ -88,10 +85,5 @@ def validateFunction(func):
 		return False
 	return True
 
-funcList = ["acos", "asin", "atan", "atan2", "ceil", "cos", "cosh",
-				   "degrees", "exp", "fabs", "floor", "fmod", "frexp",
-				   "hypot", "ldexp", "log", "log10", "modf", "pow",
-				   "radians", "sin", "sinh", "sqrt", "tan", "tanh"]
-
+funcList = sorted(bindings.keys())
 FUNCREGEX = r"(?i)%s" % "|".join(funcList)
-

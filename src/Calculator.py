@@ -5,13 +5,11 @@ import ttk, os, threading, MathCalc, subprocess, NewGraphing, GraphUtils
 
 def createGraphThread():
 	global graphThread, first
-
-	graphThread = subprocess.Popen(["python-32", "src/NewGraphing.py", equation.get()])
+	graphThread = subprocess.Popen(["python-32", sys.path[1] + "/NewGraphing.py", equation.get()])
 	# graphThread = threading.Thread(target=NewGraphing.run)
 	# graphThread.daemon = True
 	# graphThread.start()
 	
-
 def startGraphing():
 	if graphThread != None:
 		if not graphThread.poll():
