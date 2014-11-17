@@ -1,247 +1,294 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 from Tkinter import *
-import ttk, os, threading, MathCalc, subprocess, NewGraphing, GraphUtils
+import ttk, os, MathCalc, subprocess, Graphing, GraphUtils, CLineReadFile
+from platform import system
 
 def createGraphThread():
-	global graphThread, first
-	graphThread = subprocess.Popen(["python-32", sys.path[1] + "/NewGraphing.py", equation.get()])
-	# graphThread = threading.Thread(target=NewGraphing.run)
-	# graphThread.daemon = True
-	# graphThread.start()
-	
+    global graphThread, first, fList
+
+    funcArg = map(lambda element: element[6].get(), fList)
+
+    graphThread = subprocess.Popen(["python-32", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
+    
 def startGraphing():
-	if graphThread != None:
-		if not graphThread.poll():
-			createGraphThread()
-	else:
-		createGraphThread()
-	
-def equationChanged(*args):
-	eq = GraphUtils.formatExpression(equation.get())
-	result = MathCalc.readEquation(eq)
-	resultType = type(result)
+    if graphThread != None:
+        if not graphThread.poll():
+            createGraphThread()
+    else:
+        createGraphThread()
+    
+def equationChanged(stuff, var, resultString, resultLabel, num):
+    eq = GraphUtils.formatExpression(var.get())
+    result = MathCalc.readEquation(eq)
+    resultType = type(result)
+    types = [int, long, float]
 
-	if resultType is float or resultType is int:
-		resultBox.delete(0, END)
-		resultBox.insert(END, "= " + str(result))
-		resultBox.pack()
-	else:
-		resultBox.pack_forget()
-
-	# if graphThread != None and graphThread.isAlive():
-	# 	lock.acquire()
-	# 	NewGraphing.changeFunction(eq)
-	# 	lock.release()
+    if resultType in types:
+        resultString.set("= " + str(result))
+        resultLabel.grid(columnspan=1000)
+    else:
+        resultLabel.grid_forget()
 
 def buttonClicked(button):
-	if button == "C":
-		clearEquation()
-	else:
-		if button in "+-*/":
-			equation.insert(INSERT, " %c " % button)
-		else:
-			equation.insert(INSERT, button)
-	equation.focus_set()
+    global lastSelected
 
-def clearEquation():
-	equation.delete(0, END)
-	equation.focus_set()
+    if lastSelected != None:
+        if button in "+-*/":
+            lastSelected.insert(INSERT, " %c " % button)
+        else:
+            lastSelected.insert(INSERT, button)
+        lastSelected.focus_set()
 
 def addFunction(func):
-	equation.insert(INSERT, func + "()")
-	equation.icursor(equation.index(INSERT) - 1)
-	equation.focus_set()
+    global lastSelected
 
-def setDomain(domain):
-	global domainSet
+    if lastSelected != None:
+        lastSelected.insert(INSERT, func + "()")
+        lastSelected.icursor(lastSelected.index(INSERT) - 1)
+        lastSelected.focus_set()
 
-	lowerX.delete(0, END)
-	upperX.delete(0, END)
-	lowerX.insert(0, str(domain[0]))
-	upperX.insert(0, str(domain[1]))
-	domainSet = True
+def entryClicked(event):
+    global lastSelected
+    lastSelected = event.widget
 
-def setRange(rangee):
-	lowerY.delete(0, END)
-	upperY.delete(0, END)
-	lowerY.insert(0, str(rangee[0]))
-	upperY.insert(0, str(rangee[1]))
-	rangeSet = True
+def backSpaceEntry(event, fN):
+    if len(event.widget.get()) == 0:
+        removeFunc(fN)
 
-def domainChanged(*args):
-	global domainSet
+def addToFuncList(*args):
+    global fList, funcFrame, lastSelected
 
-	if graphThread != None and not domainSet:
-		lock.acquire()
-		lowX = lowerX.get()
-		upX = upperX.get()
-		lock.release()
-		if re.match(floatPattern, lowX) and re.match(floatPattern, upX):
-			NewGraphing.chooseDomain(float(lowX), float(upX), Graphing.func)
-	domainSet = False
+    fNum = len(fList) + 1
+    num = StringVar()
+    
+    single = ttk.Frame(funcFrame)
+    fLabel = ttk.Label(single, textvariable=num)
+    fLabel.grid(row=fNum, column=0, pady=2, sticky=W)
+    num.set("%d." % (fNum))
+    
+    resultString = StringVar()
+    resultLabel = Label(single, textvariable=resultString)
 
-def rangeChanged(*args):
-	global rangeSet
+    eqString = StringVar()
+    eqString.trace("w", lambda *args: equationChanged(args, eqString, resultString, resultLabel, num))
+    fEntry = ttk.Entry(single, width=15, font=eqFont, textvariable=eqString)
+    fEntry.grid(row=fNum, column=1, pady=2)
 
-	if graphThread != None and not rangeSet:
-		lock.acquire()
-		lowY = lowerY.get()
-		upY = upperY.get()
-		
-		if re.match(floatPattern, lowY) and re.match(floatPattern, upY):
-			NewGraphing.chooseRange(float(lowY), float(upY), Graphing.func)
-		lock.release()
-	rangeSet = False
+    fEntry.bind("<ButtonRelease-1>", entryClicked)
+    fEntry.bind("<Return>", addToFuncList)
+    fEntry.bind("<BackSpace>", lambda event: backSpaceEntry(event, fNum - 1))
+
+    removeButton = ttk.Button(single, width=2, text="X", command=lambda: removeFunc(fNum - 1))
+    removeButton.grid(row=fNum, column=2, pady=2)
+
+    resultLabel.grid_forget()
+
+    single.pack()
+
+    fEntry.focus_set()
+    lastSelected = fEntry
+
+    fList.append((fLabel, fEntry, removeButton, resultLabel, single, num, eqString, resultString))
+
+def removeFunc(fN):
+    global fList, lastSelected
+
+    if fN >= len(fList):
+        return
+    elif fN == 0:
+        # Clear first entry
+        fList[fN][6].set("")
+        return
+
+    # Remove all function widgets
+    widgets = fList.pop(fN)
+    for i in range(5):
+        widgets[i].destroy()
+    del widgets
+
+    for i in range(len(fList)):
+        fList[i][1].bind("<BackSpace>", lambda event, new=i: backSpaceEntry(event, new))
+        fList[i][2].configure(command=lambda new=i: removeFunc(new))
+        fList[i][5].set("%d." % (i + 1))
+
+    fList[fN - 1][1].focus_set()
+    lastSelected = fList[fN - 1][1]
 
 def validateInput(action, text):
-	if action == "0" or text in "0123456789.+-" or re.match(floatPattern, text):
-		return True
-	return False
+    if action == "0" or text in "0123456789.+-" or re.match(floatPattern, text):
+        return True
+    return False
+
+#def testValidateInput():  **Testing function for the validateInput method, not quite sure where re or floatPattern are defined so i left them out** 
+#   action = "1"
+#   text = "1"
+#   boo = True
+#   boo = validateInput(action, text)
+#   print boo
 
 def doGUI():
-	global domainSet, floatPattern, graphThread, equation, resultBox, lowerX, upperX, lowerY, upperY, lock
+    global root, domainSet, floatPattern, graphThread, equation, resultBox, \
+        lowerX, upperX, lowerY, upperY, fList, funcFrame, eqFont, lastSelected
 
-	lock = threading.Lock()
+    buttons = [["7", "8", "9", "/"],
+               ["4", "5", "6", "*"],
+               ["1", "2", "3", "-"],
+               ["0", ".", "=", "+"]]
 
-	buttons = [["7", "8", "9", "/"],
-			   ["4", "5", "6", "*"],
-			   ["1", "2", "3", "-"],
-			   ["0", ".", "C", "+"]]
+    trig = [["sin", "arcsin", "sinh"],
+            ["cos", "arccos", "cosh"],
+            ["tan", "arctan", "tanh"]]
 
-	trig = [["sin", "arcsin", "sinh"],
-			["cos", "arccos", "cosh"],
-			["tan", "arctan", "tanh"]]
+    funcs = [["ln", "log", "log10"],
+             ["sqrt", "ceil", "floor"],
+             ["abs", "min", "max"]]
 
-	funcs = [["ln", "log", "log10"],
-			 ["sqrt", "ceil", "floor"],
-			 ["abs", "min", "max"]]
+    root = Tk()
+    root.minsize(720, 350)
+    root.wm_title("Graphing Calculator")
 
-	root = Tk()
-	root.minsize(600, 350)
-	s = ttk.Style()
-	print s.theme_names()
-	s.theme_use('aqua')
+    s = ttk.Style()
 
-	floatPattern = r"(\-|\+)?[0-9]+(\.[0-9]*)?"
-	first = True
-	domainSet = False
-	rangeSet = False
-	vcmd = (root.register(validateInput), '%d', '%S')
+    if system() == "Windows":
+        s.theme_use('xpnative')
+    elif system() == "Darwin":
+        s.theme_use('aqua')
+    else:
+        s.theme_use('default')
 
-	eqFont = ("Cambria", 14)
-	graphThread = None
+    floatPattern = r"(\-|\+)?[0-9]+(\.[0-9]*)?"
 
-	mainFrame = ttk.Frame(root, borderwidth=4, relief=SUNKEN)
-	topFrame = ttk.Frame(mainFrame)
+    lastSelected = None
+    vcmd = (root.register(validateInput), '%d', '%S')
+    fList = []
 
-	text = StringVar()
-	text.trace("w", equationChanged)
+    eqFont = ("Cambria", 14)
+    graphThread = None
 
-	equation = ttk.Entry(topFrame, font=eqFont, textvariable=text)
-	equation.pack(side=LEFT, padx=4, pady=6, fill=X, expand=True)
+    leftPane = PanedWindow(root)
+    leftPane.pack(fill=BOTH, expand=1)
 
-	graph = ttk.Button(topFrame, width=5, text="Graph", command=startGraphing)
-	graph.pack(side=RIGHT, padx=4, pady=2)
+    innerPane = PanedWindow(leftPane, orient=VERTICAL)
+    innerPane.pack(fill=BOTH, expand=1)
+    leftPane.add(innerPane)
 
-	topFrame.pack(fill=X)
+    listControl = ttk.Frame(innerPane, borderwidth=4, relief=SUNKEN)
+    add = ttk.Button(listControl, width=3, text="+", command=addToFuncList)
+    add.pack(side=LEFT)
+    graph = ttk.Button(listControl, width=5, text="Graph", command=startGraphing)
+    graph.pack(side=RIGHT, padx=4, pady=2)
+    listControl.pack()
 
-	resultFrame = ttk.Frame(mainFrame)
+    innerPane.add(listControl)
 
-	resultBox = ttk.Entry(resultFrame)
-	resultBox.pack_forget()
+    funcFrame = ttk.Frame(innerPane)
+    funcFrame.pack()
+    addToFuncList()
 
-	resultFrame.pack()
+    innerPane.add(funcFrame)
 
-	midFrame = ttk.Frame(mainFrame)
+    mainFrame = ttk.Frame(leftPane, borderwidth=4, relief=SUNKEN)
 
-	# Creating grid of digit/arithmetic operator buttons
-	buttonFrame = ttk.Frame(midFrame)
-	for i in xrange(len(buttons)):
-		for j in xrange(len(buttons[i])):
-			ttk.Button(
-				buttonFrame, width=6, text=buttons[i][j],
-				command=lambda r=i, c=j: buttonClicked(buttons[r][c])
-			).grid(row=i, column=j, padx=2, pady=2)
-	buttonFrame.pack(side=LEFT, padx=4)
+    text = StringVar()
+    text.trace("w", equationChanged)
 
-	# Setting up notebook containing available functions
-	tabs = ttk.Notebook(midFrame)
+    #equation = ttk.Entry(topFrame, font=eqFont, textvariable=text)
+    #equation.pack(side=LEFT, padx=4, pady=6, fill=X, expand=True)
 
-	# Tab for trig functions
-	trigFrame = ttk.Frame(tabs)
-	# Tab for misc functions
-	miscFrame = ttk.Frame(tabs)
+    resultFrame = ttk.Frame(mainFrame)
 
-	for i in xrange(len(trig)):
-		for j in xrange(len(trig[i])):
-			ttk.Button(
-				trigFrame, width=6, text=trig[i][j],
-				command=lambda r=i, c=j: addFunction(trig[r][c])
-			).grid(row=i, column=j, padx=2, pady=2)
-	trigFrame.pack()
+    resultBox = ttk.Entry(resultFrame)
+    resultBox.pack_forget()
 
-	for i in xrange(len(funcs)):
-		for j in xrange(len(funcs[i])):
-			ttk.Button(
-				miscFrame, width=6, text=funcs[i][j],
-				command=lambda r=i, c=j: addFunction(funcs[r][c])
-			).grid(row=i, column=j, padx=2, pady=2)
-	miscFrame.pack()
+    resultFrame.pack()
 
-	tabs.add(trigFrame, text="Trig")
-	tabs.add(miscFrame, text="Funcs")
+    midFrame = ttk.Frame(mainFrame)
 
-	tabs.pack(side=RIGHT)
-	midFrame.pack()
+    # Creating grid of digit/arithmetic operator buttons
+    buttonFrame = ttk.Frame(midFrame)
+    for i in xrange(len(buttons)):
+        for j in xrange(len(buttons[i])):
+            ttk.Button(
+                buttonFrame, width=6, text=buttons[i][j],
+                command=lambda r=i, c=j: buttonClicked(buttons[r][c])
+            ).grid(row=i, column=j, padx=2, pady=2)
+    buttonFrame.pack(side=LEFT, padx=4)
 
-	xLow = StringVar()
-	xLow.trace("w", domainChanged)
-	xHigh = StringVar()
-	xHigh.trace("w", domainChanged)
+    # Setting up notebook containing available functions
+    tabs = ttk.Notebook(midFrame)
 
-	yLow = StringVar()
-	yLow.trace("w", rangeChanged)
-	yHigh = StringVar()
-	yHigh.trace("w", rangeChanged)
+    # Tab for trig functions
+    trigFrame = ttk.Frame(tabs)
+    # Tab for misc functions
+    miscFrame = ttk.Frame(tabs)
 
-	xLow.set("-10")
-	xHigh.set("10")
-	yLow.set("-7.5")
-	yHigh.set("7.5")
+    for i in xrange(len(trig)):
+        for j in xrange(len(trig[i])):
+            ttk.Button(
+                trigFrame, width=6, text=trig[i][j],
+                command=lambda r=i, c=j: addFunction(trig[r][c])
+            ).grid(row=i, column=j, padx=2, pady=2)
+    trigFrame.pack()
 
-	restrictionFrame = ttk.Frame(mainFrame)
+    for i in xrange(len(funcs)):
+        for j in xrange(len(funcs[i])):
+            ttk.Button(
+                miscFrame, width=6, text=funcs[i][j],
+                command=lambda r=i, c=j: addFunction(funcs[r][c])
+            ).grid(row=i, column=j, padx=2, pady=2)
+    miscFrame.pack()
 
-	lowerX = ttk.Entry(restrictionFrame, width=8, textvariable=xLow, validate="key", validatecommand=vcmd)
-	domNotation = ttk.Label(restrictionFrame, text="≤ x ≤")
-	upperX = ttk.Entry(restrictionFrame, width=8, textvariable=xHigh, validate="key", validatecommand=vcmd)
+    tabs.add(trigFrame, text="Trig")
+    tabs.add(miscFrame, text="Misc")
 
-	lowerY = ttk.Entry(restrictionFrame, width=8, textvariable=yLow, validate="key", validatecommand=vcmd)
-	rngNotation = ttk.Label(restrictionFrame, text="≤ y ≤")
-	upperY = ttk.Entry(restrictionFrame, width=8, textvariable=yHigh, validate="key", validatecommand=vcmd)
+    tabs.pack(side=RIGHT, fill=Y, expand=True)
+    midFrame.pack(fill=BOTH, expand=True)
 
-	lowerX.grid(row=0, column=1)
-	domNotation.grid(row=0, column=2)
-	upperX.grid(row=0, column=3)
+    xLow, xHigh = StringVar(), StringVar()
+    yLow, yHigh = StringVar(), StringVar()
 
-	lowerY.grid(row=1, column=1)
-	rngNotation.grid(row=1, column=2)
-	upperY.grid(row=1, column=3)
+    xLow.set("-10")
+    xHigh.set("10")
+    yLow.set("-7.5")
+    yHigh.set("7.5")
 
-	restrictionFrame.pack(fill=X, expand=True)
-	mainFrame.pack()
+    restrictionFrame = ttk.Frame(mainFrame)
 
-	root.mainloop()
+    lowerX = ttk.Entry(restrictionFrame, width=8, textvariable=xLow, validate="key", validatecommand=vcmd)
+    domNotation = ttk.Label(restrictionFrame, text="≤ x ≤")
+    upperX = ttk.Entry(restrictionFrame, width=8, textvariable=xHigh, validate="key", validatecommand=vcmd)
+
+    lowerY = ttk.Entry(restrictionFrame, width=8, textvariable=yLow, validate="key", validatecommand=vcmd)
+    rngNotation = ttk.Label(restrictionFrame, text="≤ y ≤")
+    upperY = ttk.Entry(restrictionFrame, width=8, textvariable=yHigh, validate="key", validatecommand=vcmd)
+
+    lowerX.grid(row=0, column=1)
+    domNotation.grid(row=0, column=2)
+    upperX.grid(row=0, column=3)
+
+    lowerY.grid(row=1, column=1)
+    rngNotation.grid(row=1, column=2)
+    upperY.grid(row=1, column=3)
+
+    restrictionFrame.pack(fill=BOTH, expand=True)
+
+    mainFrame.pack(side=LEFT)
+    leftPane.add(mainFrame)
+
+    root.mainloop()
 
 if __name__ == "__main__":
-	if len(sys.argv) > 1:
-		try:
-			fileContents = CLineReadFile.readFile(sys.argv[1])
-			expressions = CLineReadFile.parseContents(fileContents)
-			results = CLineReadFile.evalExpressions(expressions)
-			CLineReadFile.printResults(results)
-		except (Exception):
-			print "File not found"
-	else: 
-		doGUI()
+    if len(sys.argv) > 1:
+        try:
+            fileContents = CLineReadFile.readFile(sys.argv[1])
+        except:
+            print "File not found."
+            sys.exit(0)
+        expressions = CLineReadFile.parseContents(fileContents)
+        results = CLineReadFile.evalExpressions(expressions)
+        CLineReadFile.printResults(results)
+
+    else: 
+        doGUI()
 

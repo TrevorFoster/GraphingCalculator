@@ -5,47 +5,56 @@ def relativePath(curr, up, new):
     return path.abspath(path.join(curr, (pardir + "/") * up)) + new
 
 def readFile(fileName):
-	# Open and read file contents
-	with open(fileName, "r") as fileHandle:
-		contents = fileHandle.read()
+    # Open and read file contents
+    with open(fileName, "r") as fileHandle:
+        contents = fileHandle.read()
 
-	# Return file's contents
-	return contents
+    # Return file's contents
+    return contents
+    
+#def readFileTest():   **readFile test**
+#   if readFile("testFile.txt") != "2+4\n2*sin(pi/2)\n1+1\n":
+#       print "**readFile failed**"
+#       return False
+#   else:
+#       print "**readFile success**"
+#       return True
+    
 
 def parseContents(fileContents):
-	from GraphUtils import formatExpression
+    from GraphUtils import formatExpression
 
-	parsed = map(lambda line: formatExpression(line),
-		filter(lambda line: line, fileContents.split("\n"))
-		)
-	return parsed
+    parsed = map(lambda line: formatExpression(line),
+        filter(lambda line: line, fileContents.splitlines())
+        )
+    return parsed
 
 def evalExpressions(expressions):
-	from MathCalc import readEquation
+    from MathCalc import readEquation
 
-	# Evaluate each expression in expressions
-	results = map(lambda result: "Expression invalid." if result == None else str(result),
-		map(lambda exp: readEquation(exp), expressions)
-	)
+    # Evaluate each expression in expressions
+    results = map(lambda result: "Expression invalid." if result == None else str(result),
+        map(lambda exp: readEquation(exp), expressions)
+    )
 
-	# Return results
-	return results
+    # Return results
+    return results
 
 def printResults(results):
-	for result in results:
-		print str(result)
-		
+    for result in results:
+        print str(result)
+        
 def testParseContents():
-	if parseContents("8+7\n3*6\n\n4*2\n") != ["8+7", "3*6", "4*2"]:
-		print "** testParseContents failed **"
-		return False
-	else:
-		return True
-	
+    if parseContents("8+7\n3*6\n\n4*2\n") != ["8+7", "3*6", "4*2"]:
+        print "** testParseContents failed **"
+        return False
+    else:
+        return True
+    
 def testEvalExpressions():
-	if evalExpressions(["8+7", "3*6"]) != ["15", "18"]:
-		print "** testEvalExpressions failed **"
-		return False
-	else:
-		return True
-		
+    if evalExpressions(["8+7", "3*6"]) != ["15", "18"]:
+        print "** testEvalExpressions failed **"
+        return False
+    else:
+        return True
+        

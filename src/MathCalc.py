@@ -1,6 +1,5 @@
 #!/usr/bin/python
 from __future__ import division
-import math
 
 from math import acos, asin, atan, atan2, ceil, cos, cosh,\
     degrees, e, exp, fabs, floor, fmod, frexp,\
@@ -30,8 +29,12 @@ try:
 except Exception:
     print "File not found"
 
-bindings = dict([(b[0], locals().get(b[1], None)) \
-    for b in sorted(map(lambda line: line.split(":"), contents.split("\n")), key=lambda b: b[0])])
+_funcMaps = map(lambda line: line.split(":"), contents.splitlines())
+funcList = map(lambda mapping: mapping[0], _funcMaps)
+
+bindings = dict([(b[0], locals().get(b[1], None)) for b in sorted(_funcMaps, key=lambda b: b[0])])
+bindings["min"] = min
+bindings["max"] = max
 
 def testReadEquation():
     if readEquation("7+3") != 10:

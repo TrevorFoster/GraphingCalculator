@@ -1,11 +1,11 @@
-acos:acos
 arccos:acos
-asin:asin
+acos:acos
 arcsin:asin
-atan:atan
+asin:asin
 arctan:atan
-atan2:atan2
+atan:atan
 arctan2:atan2
+atan2:atan2
 ceil:ceil
 cos:cos
 cosh:cosh
@@ -29,3 +29,5 @@ sinh:sinh
 sqrt:sqrt
 tan:tan
 tanh:tanh
+min:min
+max:max

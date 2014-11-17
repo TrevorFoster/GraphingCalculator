@@ -1,166 +1,166 @@
 #!/usr/bin/python
 import sys
-import re, MathCalc, copy, pygame, sys
+from CLineReadFile import relativePath
+sys.path.insert(0, relativePath(sys.path[0], 1, "/lib"))
+try:
+    import pyglet
+except ImportError:
+    print "Installing Pyglet... Please wait a moment..."
+    from subprocess import call
 
-def frange(start, stop, step):
-    vals = []
-    i = start
-    while i <= stop:
-        vals.append(i)
-        i += step
-    return vals
+    call(["make", "-C", relativePath(sys.path[0], 1, "")])
+    del call
+    
+    try:
+        import pyglet
+    except ImportError:
+        print "Pyglet not found."
+        sys.exit(0)
 
-def formatExpression(func):
-    global dependentVar
-
-    # Attempts to format multiplication in the expression properly
-    # so that it may be successfully evaluated
-    def fixMultiplication(func):
-        result = re.sub(r"(\b[0-9]+(?:\.[0-9]+)?) *(?=[A-Za-z]+)", lambda match: match.group() + "*", func)
-
-        return re.sub(r"\) *[\w(]", lambda match: "%s*%s"  % (match.group()[0], match.group()[1:]), result)
-
-    # Attempts to format exponents in the expression properly
-    # so that it may be successfully evaluated
-    def fixExponents(func):
-        return re.sub(r"\^+", "**", func)
-
-    # Removes dependant variable from expression if it contains
-    # a dependant variable
-    def removeDependant(func):
-        if func.count("=") == 1:
-            parts = func.split("=")
-
-            return parts[1].strip()
-        return func
-
-    func = func.strip()
-    return removeDependant(fixExponents(fixMultiplication(func)))
-
-def validateFunction(func):
-    # Finds total number of unmatched brackets in the expression
-    # if negative there are closing brackets missing opening brackets
-    # if positive there are opening brackets missing a closing brace
-    def matchBrackets(func):
-        return func.count("(") - func.count(")")
-
-    # Attempts to find function calls missing opening brace
-    def findWithoutOpening(func):
-        result = ""
-        last = 0
-        for op in re.finditer(FUNCREGEX, func):
-            i = op.span()[1]
-
-            while i < len(func) and func[i].isspace(): i += 1
-
-            if func[i] != "(":
-                result += func[last: i] + "("
-                last = i
-            else:
-                result += func[last: op.span()[1]]
-                last = op.span()[1]
-        result += func[last:]
-
-        return result
-
-    dif = matchBrackets(findWithoutOpening(func))
-    bracks = matchBrackets(func)
-    if bracks != 0:
-        print "Invalid expression %d unmatched brackets." % bracks
-        return False
-    elif dif != 0:
-        print "Invalid expression %d unmatched brackets." % dif
-        return False
-    return True
+import re, random, MathCalc, GraphUtils
+from pyglet.window import key, mouse
+from pyglet.gl import *
 
 # Graphs the function for the domain passed to the function
 # Centers the coordinates around center point
-def trace(func, domain, center, zoom):
+def traceDomain(func, domain, center, zoom):
+    global camView
     graph = []
 
+    ind = GraphUtils.findIndependent(func)
+    if ind != None:
+        ind = ind[0]
     for x in domain:
         x /= zoom[0]
-        y = MathCalc.readEquation(func, (independentVar, x))
+        y = MathCalc.readEquation(func, (ind, x))
         if y != None:
-            graph.append((x * zoom[0] + center[0], -(y * zoom[1]) + center[1]))
+            graph += (x * zoom[0] + center[0] - camView[0],
+                constants.WINDH - (-(y * zoom[1]) + center[1]) + camView[1])
 
     return graph
 
-def drawGraph(coords):
-    pygame.draw.lines(screen, [60, 60, 150], False, coords, 3)
+def traceRange(func, grange, center, zoom):
+    global camView
+    graph = []
 
+    ind = GraphUtils.findIndependent(func)
+    if ind != None:
+        ind = ind[0]
+    for y in grange:
+        y /= zoom[1]
+        x = MathCalc.readEquation(func, (ind, y))
+        if x != None:
+            graph += (x * zoom[0] + center[0] - camView[0],
+                constants.WINDH - (-(y * zoom[1]) + center[1]) + camView[1])
+
+    return graph
+
+# Draws 
+def drawGraph(coords, colour):
+    pyglet.graphics.draw(len(coords) / 2, pyglet.gl.GL_LINE_STRIP,
+        ('v2f', coords),
+        ('c4f', colour * (len(coords) / 2))
+    )
+    
+# Draws both the x and y axes centered around center
 def drawAxes(center):
-    global WINDW, WINDH
+    # Offset center y by OpenGL draw origin
+    center = (float(center[0]), constants.WINDH - float(center[1]))
 
-    center = (float(center[0]), float(center[1]))
-    pygame.draw.line(screen, [0, 0, 0], [0, center[1]], [WINDW, center[1]], 3)
-    pygame.draw.line(screen, [0, 0, 0], [center[0], 0], [center[0], WINDH], 3)    
+    pyglet.graphics.draw(2, pyglet.gl.GL_LINES,
+        ('v2f', (0, center[1], constants.WINDW, center[1])),
+        ('c4f', (0.196078431, 0.196078431, 0.196078431, 0, 0.196078431, 0.196078431, 0.196078431, 0))
+    )
+    
+
+    pyglet.graphics.draw(2, pyglet.gl.GL_LINES,
+        ('v2f', (center[0], constants.WINDH, center[0], 0)),
+        ('c4f', (0.196078431, 0.196078431, 0.196078431, 0, 0.196078431, 0.196078431, 0.196078431, 0))
+    )
+    
 
 def drawText(graph):
-    dim = [xrange(80), xrange(24)]
+    dim = [xrange(60), xrange(18)]
 
-    realGraph = map(lambda p: [int(p[0] / zoom[0]),
-                               int(p[1] / zoom[1])], graph
-                )
+    realGraph = map(lambda p: [int(p[0] / zoom[0]), int(p[1] / zoom[1])], (zip(graph[0::2], graph[1::2])))
+
     result = "\n".join(
         map(lambda row: "".join(row),
              [map(lambda x: "*" if [x, y] in realGraph else " ", dim[0]) for y in dim[1]])
-    
+        )
 
     print result
 
-def fixScale(func):
+def fixScale():
     global zoom, camView
 
     zoom[1] = zoom[0]
-    needsUpdate = True
+    update.needsUpdate = True
 
-def chooseDomain(lower, upper, func):
+def chooseDomain(lower, upper):
     global zoom, camView
 
     boundLength = abs(upper - lower)
 
-    zoom[0] = float(WINDW) / boundLength
-    camView = (lower * zoom[0] + WINDW / 2, camView[1])
+    zoom[0] = float(constants.WINDW) / boundLength
+    camView = (lower * zoom[0] + constants.WINDW / 2.0, camView[1])
 
-    needsUpdate = True
+    update.needsUpdate = True
 
-def chooseRange(lower, upper, func):
+def chooseRange(lower, upper):
     global zoom, camView
 
     boundLength = abs(upper - lower)
 
-    zoom[1] = float(WINDH) / boundLength
-    camView = (camView[0], -(upper * zoom[1] - WINDH / 2))
+    zoom[1] = float(constants.WINDH) / boundLength
+    camView = (camView[0], -(upper * zoom[1] - constants.WINDH / 2.0))
 
-    needsUpdate = True
+    update.needsUpdate = True
+
+def graphDomain(func):
+    global camView, zoom, axisCenter
+
+    step = float(constants.WINDW) / (constants.SIGPOINTS / 2.0)
+
+    domain = GraphUtils.frange((-(constants.WINDW / 2.0) + camView[0]) - 1,
+            (constants.WINDW / 2.0 + camView[0]) + 1, step)
+
+    viewGraph = traceDomain(GraphUtils.removeDependant(func), domain, axisCenter, zoom)
+    return viewGraph
+
+def graphRange(func):
+    global camView, zoom, axisCenter
+
+    step = float(constants.WINDH) / (constants.SIGPOINTS / 2.0)
+    grange = GraphUtils.frange((-(constants.WINDH / 2.0) - camView[1]) - 1,
+            (constants.WINDH / 2.0 - camView[1]) + 1, step)
+
+    viewGraph = traceRange(GraphUtils.removeDependant(func), grange, axisCenter, zoom)
+    return viewGraph
 
 def updateGraph(func):
-    global viewGraph, axisView, zoom
-    step = float(WINDW) / sigPoints
-    domain = frange((-(WINDW / 2.0) + camView[0]), (WINDW / 2.0 + camView[0]), step)
+    global axisView, zoom, camView, axisCenter
 
-    coords = trace(func, domain, axisCenter, zoom)
+    dependant = GraphUtils.findDependant(func)
+    if dependant in "yY":
+        viewGraph = graphDomain(func)
+    elif dependant in "xX":
+        viewGraph = graphRange(func)
+    else:
+        independant = GraphUtils.findIndependent(func)
+
+        if "y" in independant or "Y" in independant:
+            viewGraph = graphRange(func)
+        elif "x" in independant or "X" in independant:
+            viewGraph = graphDomain(func)
+        else:
+            viewGraph = graphDomain(func)
 
     # Translate the graph and axis into view
-    viewGraph = translate(camView, *coords)
     axisView = translate(camView, axisCenter)
 
-    needsUpdate = True
+    return viewGraph
 
-# -----------------------------------------------------
-# translate:
-# params: tuple translation - A vector to translate a vector
-# or set of vectors with
-# list args         - A list of vectors to be
-# translated
-#
-# return: The array of coordinates translated by the translation
-# vector as two tuples
-#
-# desc: Translates a vector or set of vectors by a translation
-# vector
-# -------------------------------------------------------
 def translate(translation, *args):
     translated = []
     transX, transY = translation
@@ -192,228 +192,172 @@ def zoomOut(zoomSpeed):
     # Center the camera while zooming
     camView = (camView[0] / zoomSpeed, camView[1] / zoomSpeed)
 
-def findIndependent(func):
-    varsFound = list(set(filter(lambda word: not word in funcList, re.findall("[A-Za-z]\w*", func))))
+def addFunction(newFunc):
+    global functions, independant, colours
 
-    if len(varsFound) == 1:
-        setIndependant(varsFound[0])
-   
-def setIndependant(newVar):
-    global independentVar
-
-    independentVar = newVar
-
-def setDependant(newVar):
-    global dependentVar
-
-    dependentVar = newVar
-
-def changeFunction(newFunc):
-    global origFunc, func, needsUpdate
-
-    formatted = formatExpression(newFunc)
-    if validateFunction(formatted):
+    formatted = GraphUtils.formatExpression(newFunc)
+    if GraphUtils.validateFunction(formatted):
         origFunc = newFunc
         if len(origFunc) == 0:
             origFunc = " "
         func = formatted
-        findIndependent(func)
-        
-        needsUpdate = True
-        return font.render(dependentVar + " = " + origFunc, 1, [0, 0, 0])
+        independant = GraphUtils.findIndependent(func)
 
-    return None
+        functions.append(func)
+        for i in range(len(functions)):
+            functions[i] = GraphUtils.nestFunctions(functions[i], functions[:i] + functions[i + 1:])
 
-def updateXBounds():
-    global boundsX
+        graphs.append([])
+        colours.append(chooseColour())
 
-    boundsX = [(-(WINDW / 2.0) + camView[0]) / zoom[0], (WINDW / 2.0 + camView[0]) / zoom[0]]
-    for callback in domChangedCallbacks:
-        callback(boundsX)
+        update.needsUpdate = True
 
-def updateYBounds():
-    global boundsY
+def chooseColour():
+    global lastColour
 
-    boundsY = [(-(WINDH / 2.0) - camView[1]) / zoom[1], (WINDH / 2.0 - camView[1]) / zoom[1]]
-    for callback in rngChangedCallbacks:
-        callback(boundsY)
+    if lastColour == -1:
+        lastColour = random.randint(0, len(constants.PRECOLOURS) - 1)
 
-def subscribeDomain(callback):
-    global domChangedCallbacks
+    lastColour += 1
+    if lastColour >= len(constants.PRECOLOURS):
+        lastColour = 0
+    return constants.PRECOLOURS[lastColour]
 
-    domChangedCallbacks.append(callback)
+def update(dt):
+    global functions
 
-def subscribeRange(callback):
-    global rngChangedCallbacks
+    if update.upHeld:
+        zoomIn(constants.QUICKZOOMCONST)
+        update.needsUpdate = True      # Update the graph with the new scale
+    if update.downHeld:
+        zoomOut(constants.QUICKZOOMCONST)
+        update.needsUpdate = True      # Update the graph with the new scale
 
-    rngChangedCallbacks.append(callback)
+    if update.needsUpdate:
+        for i in range(len(graphs)):
+            graphs[i] = updateGraph(functions[i])
+        update.needsUpdate = False
 
-def subAvailable():
-    try:
-        domChangedCallbacks
-    except NameError:
-        return False
-    else:
-        try:
-            rngChangedCallbacks
-        except NameError:
-            return False
-        else:
-            return True
+def constants():
+    constants.WINDW = 800
+    constants.WINDH = 600
+    constants.SIGPOINTS = 600
+    constants.ZOOMCONST = 1.08
+    constants.QUICKZOOMCONST = 1.01
+    def toOpenGL(colour):
+        return map(lambda component: component / 255., colour)
 
-def run(function = None):
-    global WINDW, WINDH, sigPoints, camView, axisCenter, axisView, zoom,\
-       screen, viewGraph, func, origFunc, dependentVar, independentVar, FUNCREGEX, funcList,\
-       domChangedCallbacks, rngChangedCallbacks, boundsX, boundsY, needsUpdate, font, ZOOMCONST, QUICKZOOMCONST
+    constants.PRECOLOURS = map(lambda colour: toOpenGL(colour), [
+        [79, 129, 189, 0], [128, 100, 162, 0], [247, 150, 70, 0], [0, 0, 0, 0],
+        [155, 200, 89, 0]
+    ])
 
-    WINDW, WINDH = 800, 600
-    sigPoints = 300
-    ZOOMCONST = 1.08
-    QUICKZOOMCONST = 1.01
+def run():
+    global zoom, camView, dependentVar, independentVar, axisView, functions, graphs, colours, lastColour
+    constants()        # define necessary constants
     zoom = [20, 20]
     camView = (0, 0)
-    axisCenter = (WINDW / 2, WINDH / 2)
-    viewGraph = []
-    axisView = []
-    domChangedCallbacks, rngChangedCallbacks = [] , []
-    dependentVar, independentVar = "y", "x"
+    axisCenter = (constants.WINDW / 2, constants.WINDH / 2)
+    axisView = axisCenter
+
+    independentVar, dependentVar = "x", "y"
     boundsX = [-10, 10]
-    funcList = ["acos", "asin", "atan", "atan2", "ceil", "cos", "cosh",
-                   "degrees", "exp", "fabs", "floor", "fmod", "frexp",
-                   "hypot", "ldexp", "log", "log10", "modf", "pow",
-                   "radians", "sin", "sinh", "sqrt", "tan", "tanh"]
-
-    FUNCREGEX = r"|".join(funcList)
-
+    boundsY = [-7.5, 7.5]
+    functions = []
+    graphs = []
+    colours = []
+    lastColour = -1
     origFunc = ""
+    if len(sys.argv) > 1:
+        print sys.argv
+        funcs = int(sys.argv[1])
+        for i in range(2, 2 + funcs):
+            addFunction(sys.argv[i])
+        if len(sys.argv) > 2 + funcs:
+            boundsX = map(lambda i: float(i), sys.argv[2 + funcs].split(","))
+        if len(sys.argv) > 3 + funcs:
+            print sys.argv[3]
+            boundsY = map(lambda i: float(i), sys.argv[3 + funcs].split(","))
 
-    if function != None:
-        origFunc = function[:]
-    elif len(sys.argv) > 1:
-        origFunc = sys.argv[1]
-
-    needsUpdate = True
+    update.needsUpdate = True
     updateBounds = False
 
-    upHeld = False
-    downHeld = False
-    # Initialize mouse stuff
-    leftDown = False
-    moved = False
-    prevMousePos = None
+    update.upHeld = False
+    update.downHeld = False
 
-    pygame.init()
-    pygame.font.init()
-    pygame.display.init()
-    font = pygame.font.SysFont("Courier", 32)
-    axesFont = pygame.font.SysFont("Courier", 20)
-    screen = pygame.display.set_mode([WINDW, WINDH], pygame.RESIZABLE)
+    chooseDomain(boundsX[0], boundsX[1])
+    chooseRange(boundsY[0], boundsY[1])
 
-    eqSurf = changeFunction(origFunc)
-    chooseDomain(-10, 10, func)
-    fixScale(func)
-    running = True
+    update.needsUpdate = True
 
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.VIDEORESIZE:
-                # store the window's new size
-                WINDW, WINDH = event.size
+    window = pyglet.window.Window(resizable=True, caption="Graph Window", width=constants.WINDW, height=constants.WINDH)
+    pyglet.clock.schedule(update)
 
-                # re center the axis
-                axisCenter = (WINDW / 2, WINDH / 2)
-                screen = pygame.display.set_mode([WINDW, WINDH], pygame.RESIZABLE | pygame.DOUBLEBUF)
+    @window.event
+    def on_key_press(symbol, modifiers):
+        if symbol == key.UP:
+            update.upHeld = True
+        if symbol == key.DOWN:
+            update.downHeld = True
+        if symbol == key.RETURN:
+            drawText(viewGraph)
 
-                updateGraph(func)
+    @window.event
+    def on_key_release(symbol, modifiers):
+        if symbol == key.UP:
+            update.upHeld = False
+        if symbol == key.DOWN:
+            update.downHeld = False
 
-            if event.type == pygame.QUIT:
-                # exit the game loop
-                running = False
+    @window.event
+    def on_mouse_drag(x, y, dx, dy, buttons, modifiers):
+        global camView
+        if mouse.LEFT & buttons:
+            newX = camView[0] - dx
+            newY = camView[1] + dy
+            camView = (newX, newY)
+            update.needsUpdate = True
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    drawText(viewGraph)
+    @window.event
+    def on_mouse_scroll(x, y, scroll_x, scroll_y):
+        if scroll_y > 0:
+            zoomIn(constants.ZOOMCONST)
+        else:
+            zoomOut(constants.ZOOMCONST)
 
-                if event.key == pygame.K_UP:
-                    upHeld = True
-                if event.key == pygame.K_DOWN:
-                    downHeld = True
+        # Update the graph with the new scale
+        update.needsUpdate = True
 
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_UP:
-                    upHeld = False
-                if event.key == pygame.K_DOWN:
-                    downHeld = False
+    @window.event
+    def on_draw():
+        glClearColor(1, 1, 1, 1)
+        window.clear()
 
-            if event.type == pygame.MOUSEMOTION:
-                moved = True
+        glLineWidth(2.5)
+        glEnable(GL_LINE_SMOOTH)
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    leftDown = True
+        drawAxes(axisView)
 
-                # Mouse wheel rolled up
-                if event.button == 4:
-                    zoomIn(ZOOMCONST)
-                    # Update the graph with the new scale
-                    needsUpdate = True
-                    updateBounds = True
+        glLineWidth(3.0)
 
-                # Mouse wheel rolled down
-                elif event.button == 5:
-                    zoomOut(ZOOMCONST)
-                    # Update the graph with the new scale
-                    needsUpdate = True
-                    updateBounds = True
+        for i in range(len(graphs)):
+            drawGraph(graphs[i], colours[i])
 
-            if event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1:
-                    leftDown = False
-                    prevMousePos = None
+        glFlush()
 
-        if upHeld:
-            zoomIn(QUICKZOOMCONST)
-            needsUpdate = True      # Update the graph with the new scale
-            updateBounds = True
+    @window.event
+    def on_resize(width, height):
+        global axisCenter
+    
+        # store the window's new size
+        constants.WINDW, constants.WINDH = width, height
 
-        if downHeld:
-            zoomOut(QUICKZOOMCONST)
-            needsUpdate = True      # Update the graph with the new scale
-            updateBounds = True
+        # re center the axis
+        axisCenter = (width / 2.0, height / 2.0)
+    
+        update.needsUpdate = True
 
-        if moved and leftDown:
-            mPos = pygame.mouse.get_pos()
-            if prevMousePos:
-                newX = camView[0] + prevMousePos[0] - mPos[0]
-                newY = camView[1] + prevMousePos[1] - mPos[1]
-                camView = (newX, newY)
-                needsUpdate = True
-                updateBounds = True
-
-            prevMousePos = mPos
-            moved = False
-
-        if updateBounds:
-            updateXBounds()
-            updateYBounds()
-            updateBounds = False
-
-        if needsUpdate:
-            updateGraph(func, )
-            
-            screen.fill([255, 255, 255])
-
-            if eqSurf != None:
-                screen.blit(eqSurf, (0, 0))
-
-            drawAxes(axisView)
-            if len(viewGraph) >= 2:
-                drawGraph(viewGraph)
-
-            pygame.display.update()  # update the screen surface
-            needsUpdate = False
-
-    pygame.quit()  # free pygame's resources
+    pyglet.app.run()
 
 if __name__ == "__main__":
     run()
