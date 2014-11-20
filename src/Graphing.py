@@ -5,12 +5,24 @@ sys.path.insert(0, relativePath(sys.path[0], 1, "/lib"))
 try:
     import pyglet
 except ImportError:
-    print "Installing Pyglet... Please wait a moment..."
-    from subprocess import call
+    print "Installing Pyglet. Please wait a moment..."
+    from subprocess import call, PIPE
+    from os import devnull
 
-    call(["make", "-C", relativePath(sys.path[0], 1, "")])
-    del call
-    
+    sys.stdout.write("Extracting....")
+    call(["make", "-C", relativePath(sys.path[0], 1, ""), "extract"], stdout=open(devnull, 'wb'))
+    print "Done"
+
+    sys.stdout.write("Building....")
+    call(["make", "-C", relativePath(sys.path[0], 1, ""), "build"], stdout=open(devnull, 'wb'))
+    print "Done"
+
+    sys.stdout.write("Cleaning up....")
+    call(["make", "-C", relativePath(sys.path[0], 1, ""), "clean"], stdout=open(devnull, 'wb'))
+    print "Done"
+
+    del call, PIPE, devnull
+
     try:
         import pyglet
     except ImportError:
@@ -59,7 +71,7 @@ def traceRange(func, grange, center, zoom):
 def drawGraph(coords, colour):
     pyglet.graphics.draw(len(coords) / 2, pyglet.gl.GL_LINE_STRIP,
         ('v2f', coords),
-        ('c4f', colour * (len(coords) / 2))
+        ('c4f', constants.CVECTORS[colour][:len(coords) * 2])
     )
     
 # Draws both the x and y axes centered around center
@@ -139,7 +151,7 @@ def graphRange(func):
     return viewGraph
 
 def updateGraph(func):
-    global axisView, zoom, camView, axisCenter
+    global zoom, camView
 
     dependant = GraphUtils.findDependant(func)
     if dependant in "yY":
@@ -155,9 +167,6 @@ def updateGraph(func):
             viewGraph = graphDomain(func)
         else:
             viewGraph = graphDomain(func)
-
-    # Translate the graph and axis into view
-    axisView = translate(camView, axisCenter)
 
     return viewGraph
 
@@ -195,17 +204,10 @@ def zoomOut(zoomSpeed):
 def addFunction(newFunc):
     global functions, independant, colours
 
-    formatted = GraphUtils.formatExpression(newFunc)
-    if GraphUtils.validateFunction(formatted):
-        origFunc = newFunc
-        if len(origFunc) == 0:
-            origFunc = " "
-        func = formatted
-        independant = GraphUtils.findIndependent(func)
+    if GraphUtils.validateFunction(newFunc):
+        independant = GraphUtils.findIndependent(newFunc)
 
-        functions.append(func)
-        for i in range(len(functions)):
-            functions[i] = GraphUtils.nestFunctions(functions[i], functions[:i] + functions[i + 1:])
+        functions.append(newFunc)
 
         graphs.append([])
         colours.append(chooseColour())
@@ -215,16 +217,16 @@ def addFunction(newFunc):
 def chooseColour():
     global lastColour
 
-    if lastColour == -1:
-        lastColour = random.randint(0, len(constants.PRECOLOURS) - 1)
+    if chooseColour.lastColour == -1:
+        chooseColour.lastColour = random.randint(0, len(constants.PRECOLOURS) - 1)
 
-    lastColour += 1
-    if lastColour >= len(constants.PRECOLOURS):
-        lastColour = 0
-    return constants.PRECOLOURS[lastColour]
+    chooseColour.lastColour += 1
+    if chooseColour.lastColour >= len(constants.PRECOLOURS):
+        chooseColour.lastColour = 0
+    return chooseColour.lastColour
 
 def update(dt):
-    global functions
+    global functions, axisView
 
     if update.upHeld:
         zoomIn(constants.QUICKZOOMCONST)
@@ -236,7 +238,13 @@ def update(dt):
     if update.needsUpdate:
         for i in range(len(graphs)):
             graphs[i] = updateGraph(functions[i])
+        # Translate axis into view
+        axisView = translate(camView, axisCenter)
+
         update.needsUpdate = False
+
+def toOpenGL(colour): 
+    return map(lambda component: float("%.3f" % (component / 255.)), colour)
 
 def constants():
     constants.WINDW = 800
@@ -244,43 +252,39 @@ def constants():
     constants.SIGPOINTS = 600
     constants.ZOOMCONST = 1.08
     constants.QUICKZOOMCONST = 1.01
-    def toOpenGL(colour):
-        return map(lambda component: component / 255., colour)
 
     constants.PRECOLOURS = map(lambda colour: toOpenGL(colour), [
         [79, 129, 189, 0], [128, 100, 162, 0], [247, 150, 70, 0], [0, 0, 0, 0],
         [155, 200, 89, 0]
     ])
+    constants.CVECTORS = map(lambda colour: colour * (constants.SIGPOINTS / 2 + 1), constants.PRECOLOURS)
 
 def run():
-    global zoom, camView, dependentVar, independentVar, axisView, functions, graphs, colours, lastColour
+    global zoom, camView, axisView, functions, graphs, colours, lastColour
     constants()        # define necessary constants
-    zoom = [20, 20]
-    camView = (0, 0)
+
+    zoom, camView = [20, 20], (0, 0)
     axisCenter = (constants.WINDW / 2, constants.WINDH / 2)
     axisView = axisCenter
 
-    independentVar, dependentVar = "x", "y"
     boundsX = [-10, 10]
     boundsY = [-7.5, 7.5]
-    functions = []
-    graphs = []
-    colours = []
-    lastColour = -1
-    origFunc = ""
+
+    functions, graphs = [], []
+    colours, chooseColour.lastColour = [], -1
+
     if len(sys.argv) > 1:
-        print sys.argv
         funcs = int(sys.argv[1])
+
         for i in range(2, 2 + funcs):
             addFunction(sys.argv[i])
+
         if len(sys.argv) > 2 + funcs:
             boundsX = map(lambda i: float(i), sys.argv[2 + funcs].split(","))
+
         if len(sys.argv) > 3 + funcs:
             print sys.argv[3]
             boundsY = map(lambda i: float(i), sys.argv[3 + funcs].split(","))
-
-    update.needsUpdate = True
-    updateBounds = False
 
     update.upHeld = False
     update.downHeld = False

@@ -104,18 +104,32 @@ def nestFunctions(func, other):
         for i in range(len(other)):
             otherFormatted = formatExpression(other[i])
             dependant = findDependant(otherFormatted)
+            print dependant
             if dependant not in "xXyY" and dependant in independant:
                 result = re.sub(r"\b%s\b" % independant, 
                     lambda match: removeDependant(nestFunctions(other[i], other[:i] + other[i + 1:])), result)
     return result
 
 def defineFunctions(functions):
+    anyDefined = False
     for f in functions:
+        if f.count("=") != 1:
+            continue
+
         dependant = findDependant(f)
+        
+        if dependant == "y": continue
         match = re.search(r"([A-Za-z]\w*) *\((.+)\)", dependant)
-        if match and match.group(1) not in funcList:
+        if match == None: continue
+
+        if match and match.group(1) and match.group(1) not in funcList or\
+            (match.group(1) in funcList and match.group(1) in userFuncMapings):
+            anyDefined = True
             userFuncMapings[match.group(1)] = (map(lambda arg: arg.strip(), match.group(2).split(",")), f)
+
+        if match.group(1) not in funcList:
             funcList.append(match.group(1))
+    return anyDefined
 
 def getArgs(f, start):
     i = start
@@ -124,15 +138,17 @@ def getArgs(f, start):
     open = 1
     i += 1
     while i < len(f) and open != 0:
-        if f[i] == "(":
-            open += 1
-        elif f[i] == ")":
-            open -= 1
+        if f[i] == "(": open += 1
+        elif f[i] == ")": open -= 1
         i += 1
 
     return (argStart, i)
 
 def replaceCalls(functions):
+    if len(userFuncMapings) == 0: 
+        return functions
+
+    # Subs parameters into called function
     def callIt(match, f):
         if match and match.group(1) in userFuncMapings:
             beingCalled = userFuncMapings[match.group(1)]
@@ -142,14 +158,42 @@ def replaceCalls(functions):
                 subbed = re.sub(r"(%s)" % "|".join(beingCalled[0]), 
                     lambda match: args[beingCalled[0].index(match.group(1))], removeDependant(beingCalled[1]))
 
-                return subbed
-        return match.group()
+                return (subbed, argPos)
+            else:
+                return None
+        return (match.group(), [0, 0])
+
+    results = []
+    mapRegex = r"\b(%s)\b" % "|".join(userFuncMapings.keys())
 
     for f in functions:
-        print removeDependant(f)
-        result = re.sub(r"(%s)" % "|".join(userFuncMapings.keys()), lambda match, i=f: callIt(match, f), removeDependant(f))
-        print result
 
+        prevSub = f
+        subLeft = re.search(mapRegex, prevSub) != None
+        while subLeft:
+            result, last = "", 0
+            woDep = removeDependant(prevSub)
+            for match in re.finditer(mapRegex, woDep):
+                called = callIt(match, woDep)
+                if called == None:
+                    subLeft = False
+                    break
+
+                sub, argPos = called
+                result += woDep[last:match.start()] + sub
+                last = argPos[1]
+            result += woDep[last:]
+            
+            if prevSub.count("=") == 1:
+                prevSub = findDependant(prevSub) + "=" + result
+            prevSub = "y=" + result
+
+            if re.search(mapRegex, prevSub) == None:
+                subLeft = False
+
+        results.append(prevSub)
+
+    return results
 
 def testFormatExpression():
     result = formatExpression("y = x^2sinx)cosx)tanx)x^4")
@@ -223,5 +267,7 @@ def testValidateFunction():
 
 FUNCREGEX = r"(?i)(%s)" % "|".join(funcList)
 userFuncMapings = {}
-defineFunctions(["a(x1, x2) = 3sin(x1) + 2cos(x2)"])
-replaceCalls(["a(sin(x), cos(x)) - a(2, 4)"])
+#defineFunctions(["a(x1,x2) = sin(x1) - cos(x2)"])
+#print replaceCalls(["a(2,4)"])
+#defineFunctions(["a(x1, x2) = b(3sin(x1), 2cos(x2), x3)", "b(theta1, x1, theta2) = sqrt(theta1, x1, theta2)"])
+#print replaceCalls(["a(sin(x), cos(x)) - a(2, 4)"])

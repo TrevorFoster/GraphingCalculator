@@ -7,8 +7,11 @@ from platform import system
 def createGraphThread():
     global graphThread, first, fList
 
-    funcArg = map(lambda element: element[6].get(), fList)
-
+    funcArg = [element[6].get() for element in fList]
+    funcArg = GraphUtils.replaceCalls(funcArg)
+    funcArg = [GraphUtils.formatExpression(f) for f in funcArg]
+    funcArg = [GraphUtils.nestFunctions(e[1], funcArg[:e[0]] + funcArg[e[0] + 1:]) for e in enumerate(funcArg)]
+    
     graphThread = subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
     
 def startGraphing():
@@ -19,16 +22,31 @@ def startGraphing():
         createGraphThread()
     
 def equationChanged(stuff, var, resultString, resultLabel, num):
-    eq = GraphUtils.formatExpression(var.get())
-    result = MathCalc.readEquation(eq)
-    resultType = type(result)
-    types = [int, long, float]
+    global fList
 
-    if resultType in types:
-        resultString.set("= " + str(result))
-        resultLabel.grid(columnspan=1000)
+    def updateResults(rng):
+        replaced = GraphUtils.replaceCalls(map(lambda frame: frame[6].get(), fList[rng[0]: rng[1]]))
+        for i in range(len(replaced)):
+            replaced[i] = GraphUtils.nestFunctions(replaced[i], replaced[:i] + replaced[i + 1:])
+        for i in range(len(replaced)):
+            frame = fList[i + rng[0]]
+            eq = replaced[i]
+            eq = GraphUtils.formatExpression(eq)
+            result = MathCalc.readEquation(GraphUtils.removeDependant(eq))
+            resultType = type(result)
+            types = [int, long, float]
+
+            if resultType in types:
+                frame[7].set("= " + str(result))
+                frame[3].grid(columnspan=1000)
+            else:
+                frame[3].grid_forget()
+
+    if GraphUtils.defineFunctions([var.get()] + map(lambda frame: frame[6].get(), fList)):
+        updateResults([0, len(fList)])
     else:
-        resultLabel.grid_forget()
+        index = int(num.get()[:-1]) - 1
+        updateResults([index, index + 1])
 
 def buttonClicked(button):
     global lastSelected
@@ -72,7 +90,7 @@ def addToFuncList(*args):
 
     eqString = StringVar()
     eqString.trace("w", lambda *args: equationChanged(args, eqString, resultString, resultLabel, num))
-    fEntry = ttk.Entry(single, width=15, font=eqFont, textvariable=eqString)
+    fEntry = ttk.Entry(single, width=20, font=eqFont, textvariable=eqString)
     fEntry.grid(row=fNum, column=1, pady=2)
 
     fEntry.bind("<ButtonRelease-1>", entryClicked)
@@ -163,7 +181,7 @@ def doGUI():
     vcmd = (root.register(validateInput), '%d', '%S')
     fList = []
 
-    eqFont = ("Cambria", 14)
+    eqFont = ("Cambria", 12)
     graphThread = None
 
     leftPane = PanedWindow(root)
