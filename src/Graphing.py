@@ -257,7 +257,7 @@ def constants():
         [79, 129, 189, 0], [128, 100, 162, 0], [247, 150, 70, 0], [0, 0, 0, 0],
         [155, 200, 89, 0]
     ])
-    constants.CVECTORS = map(lambda colour: colour * (constants.SIGPOINTS / 2 + 1), constants.PRECOLOURS)
+    constants.CVECTORS = map(lambda colour: colour * (constants.SIGPOINTS / 2 + 2), constants.PRECOLOURS)
 
 def run():
     global zoom, camView, axisView, functions, graphs, colours, lastColour

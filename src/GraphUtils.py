@@ -186,9 +186,10 @@ def replaceCalls(functions):
             
             if prevSub.count("=") == 1:
                 prevSub = findDependant(prevSub) + "=" + result
-            prevSub = "y=" + result
+            else:
+                prevSub = "y=" + result
 
-            if re.search(mapRegex, prevSub) == None:
+            if re.search(mapRegex, result) == None:
                 subLeft = False
 
         results.append(prevSub)

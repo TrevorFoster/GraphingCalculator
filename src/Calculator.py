@@ -12,7 +12,7 @@ def createGraphThread():
     funcArg = [GraphUtils.formatExpression(f) for f in funcArg]
     funcArg = [GraphUtils.nestFunctions(e[1], funcArg[:e[0]] + funcArg[e[0] + 1:]) for e in enumerate(funcArg)]
     
-    graphThread = subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
+    graphThread = subprocess.Popen(["python-32", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
     
 def startGraphing():
     if graphThread != None:
