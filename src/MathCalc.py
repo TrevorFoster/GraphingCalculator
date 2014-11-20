@@ -35,6 +35,8 @@ funcList = map(lambda mapping: mapping[0], _funcMaps)
 bindings = dict([(b[0], locals().get(b[1], None)) for b in sorted(_funcMaps, key=lambda b: b[0])])
 bindings["min"] = min
 bindings["max"] = max
+bindings["pi"] = pi
+bindings["e"] = e
 
 def testReadEquation():
     if readEquation("7+3") != 10:

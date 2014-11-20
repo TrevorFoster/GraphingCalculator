@@ -9,7 +9,7 @@ def createGraphThread():
 
     funcArg = map(lambda element: element[6].get(), fList)
 
-    graphThread = subprocess.Popen(["python-32", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
+    graphThread = subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
     
 def startGraphing():
     if graphThread != None:

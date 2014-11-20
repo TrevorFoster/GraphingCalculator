@@ -16,7 +16,8 @@ def formatExpression(func):
     def fixMultiplication(func):
         result = re.sub(r"(\b[0-9]+(?:\.[0-9]+)?) *([A-Za-z]+)", lambda match: "%s*%s" % (match.group(1), match.group(2)), func)
         result = re.sub(r"(\) *)([\w(])", lambda match: "%s*%s" % (match.group(1), match.group(2)), result)
-        result = re.sub(r"(\b[0-9]+(?:\.[0-9]+)?)(\()", lambda match: "%s*%s" % (match.group(1), match.group(2)), result)
+        result = re.sub(r"((?:\b[0-9]+(?:\.[0-9]+)?)|(?:[A-Za-z]\w*))(\()",
+                    lambda match: ("%s%s" if match.group(1) in funcList else "%s*%s") % (match.group(1), match.group(2)), result)
 
         fixed, last = "", 0
         for match in re.finditer(r"(%s)\b" % FUNCREGEX, result):
@@ -32,7 +33,6 @@ def formatExpression(func):
             last = match.end()
 
         fixed += result[last:]
-        print fixed
 
         return fixed
         
@@ -109,6 +109,48 @@ def nestFunctions(func, other):
                     lambda match: removeDependant(nestFunctions(other[i], other[:i] + other[i + 1:])), result)
     return result
 
+def defineFunctions(functions):
+    for f in functions:
+        dependant = findDependant(f)
+        match = re.search(r"([A-Za-z]\w*) *\((.+)\)", dependant)
+        if match and match.group(1) not in funcList:
+            userFuncMapings[match.group(1)] = (map(lambda arg: arg.strip(), match.group(2).split(",")), f)
+            funcList.append(match.group(1))
+
+def getArgs(f, start):
+    i = start
+    while i < len(f) and f[i] != "(": i += 1
+    argStart = i
+    open = 1
+    i += 1
+    while i < len(f) and open != 0:
+        if f[i] == "(":
+            open += 1
+        elif f[i] == ")":
+            open -= 1
+        i += 1
+
+    return (argStart, i)
+
+def replaceCalls(functions):
+    def callIt(match, f):
+        if match and match.group(1) in userFuncMapings:
+            beingCalled = userFuncMapings[match.group(1)]
+            argPos = getArgs(f, match.start())
+            args = map(lambda arg: arg.strip(), f[argPos[0] + 1: argPos[1] - 1].split(","))
+            if len(args) == len(beingCalled[0]):
+                subbed = re.sub(r"(%s)" % "|".join(beingCalled[0]), 
+                    lambda match: args[beingCalled[0].index(match.group(1))], removeDependant(beingCalled[1]))
+
+                return subbed
+        return match.group()
+
+    for f in functions:
+        print removeDependant(f)
+        result = re.sub(r"(%s)" % "|".join(userFuncMapings.keys()), lambda match, i=f: callIt(match, f), removeDependant(f))
+        print result
+
+
 def testFormatExpression():
     result = formatExpression("y = x^2sinx)cosx)tanx)x^4")
     shouldBe = "x**2*sin(x)*cos(x)*tan(x)*x**4"
@@ -180,3 +222,6 @@ def testValidateFunction():
     return True
 
 FUNCREGEX = r"(?i)(%s)" % "|".join(funcList)
+userFuncMapings = {}
+defineFunctions(["a(x1, x2) = 3sin(x1) + 2cos(x2)"])
+replaceCalls(["a(sin(x), cos(x)) - a(2, 4)"])
