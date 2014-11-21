@@ -132,7 +132,7 @@ def replaceCalls(functions):
             args = map(lambda arg: arg.strip(), f[argPos[0] + 1: argPos[1] - 1].split(","))
             if len(args) == len(beingCalled[0]):
                 subbed = re.sub(r"(%s)" % "|".join(beingCalled[0]), 
-                    lambda match: args[beingCalled[0].index(match.group(1))], removeDependant(beingCalled[1]))
+                    lambda match: "("+args[beingCalled[0].index(match.group(1))]+")", removeDependant(beingCalled[1]))
 
                 return (subbed, argPos)
             else:
