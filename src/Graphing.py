@@ -10,14 +10,17 @@ except ImportError:
     from os import devnull
 
     sys.stdout.write("Extracting....")
+    # Extract pyglet from targz and mute makefile
     call(["make", "-C", relativePath(sys.path[0], 1, ""), "extract"], stdout=open(devnull, 'wb'))
     print "Done"
 
     sys.stdout.write("Building....")
+    # Build pyglet and mute makefile
     call(["make", "-C", relativePath(sys.path[0], 1, ""), "build"], stdout=open(devnull, 'wb'))
     print "Done"
 
     sys.stdout.write("Cleaning up....")
+    # Clean up pyglet source directory and mute 
     call(["make", "-C", relativePath(sys.path[0], 1, ""), "clean"], stdout=open(devnull, 'wb'))
     print "Done"
 
@@ -67,7 +70,7 @@ def traceRange(func, grange, center, zoom):
 
     return graph
 
-# Draws 
+# Draws the connected line segments to form the graph
 def drawGraph(coords, colour):
     pyglet.graphics.draw(len(coords) / 2, pyglet.gl.GL_LINE_STRIP,
         ('v2f', coords),
@@ -89,12 +92,13 @@ def drawAxes(center):
         ('v2f', (center[0], constants.WINDH, center[0], 0)),
         ('c4f', (0.196078431, 0.196078431, 0.196078431, 0, 0.196078431, 0.196078431, 0.196078431, 0))
     )
-    
 
-def drawText(graph):
+def drawText(graphs):
     dim = [xrange(60), xrange(18)]
+    realGraph = []
 
-    realGraph = map(lambda p: [int(p[0] / zoom[0]), int(p[1] / zoom[1])], (zip(graph[0::2], graph[1::2])))
+    for graph in graphs:
+        realGraph += map(lambda p: [int(p[0] / zoom[0]), int(p[1] / zoom[1])], zip(graph[0::2], graph[1::2]))
 
     result = "\n".join(
         map(lambda row: "".join(row),
@@ -106,6 +110,7 @@ def drawText(graph):
 def fixScale():
     global zoom, camView
 
+    # Equalize zoomY and zoomX for square view
     zoom[1] = zoom[0]
     update.needsUpdate = True
 
@@ -113,6 +118,8 @@ def chooseDomain(lower, upper):
     global zoom, camView
 
     boundLength = abs(upper - lower)
+    if boundLength == 0:
+        return
 
     zoom[0] = float(constants.WINDW) / boundLength
     camView = (lower * zoom[0] + constants.WINDW / 2.0, camView[1])
@@ -123,6 +130,8 @@ def chooseRange(lower, upper):
     global zoom, camView
 
     boundLength = abs(upper - lower)
+    if boundLength == 0:
+        return
 
     zoom[1] = float(constants.WINDH) / boundLength
     camView = (camView[0], -(upper * zoom[1] - constants.WINDH / 2.0))
@@ -169,18 +178,6 @@ def updateGraph(func):
             viewGraph = graphDomain(func)
 
     return viewGraph
-
-def translate(translation, *args):
-    translated = []
-    transX, transY = translation
-    for p in args:
-        translated.append([p[0] - transX, p[1] - transY])
-
-    if len(translated) == 1:
-        return translated[0]
-    else:
-        return translated
-
 
 def zoomIn(zoomSpeed):
     global zoom, camView
@@ -239,7 +236,8 @@ def update(dt):
         for i in range(len(graphs)):
             graphs[i] = updateGraph(functions[i])
         # Translate axis into view
-        axisView = translate(camView, axisCenter)
+        axisView = [axisCenter[0] - camView[0],
+                     axisCenter[1] - camView[1]]
 
         update.needsUpdate = False
 
@@ -254,8 +252,8 @@ def constants():
     constants.QUICKZOOMCONST = 1.01
 
     constants.PRECOLOURS = map(lambda colour: toOpenGL(colour), [
-        [79, 129, 189, 0], [128, 100, 162, 0], [247, 150, 70, 0], [0, 0, 0, 0],
-        [155, 200, 89, 0]
+        [79, 129, 189, 0], [128, 100, 162, 0], [247, 150, 70, 0],
+        [155, 200, 89, 0], [192, 80, 77, 0]
     ])
     constants.CVECTORS = map(lambda colour: colour * (constants.SIGPOINTS / 2 + 2), constants.PRECOLOURS)
 
@@ -289,11 +287,14 @@ def run():
     update.upHeld = False
     update.downHeld = False
 
+    # View user defined domain and range
     chooseDomain(boundsX[0], boundsX[1])
     chooseRange(boundsY[0], boundsY[1])
+    fixScale()
 
     update.needsUpdate = True
 
+    # Initialize window object
     window = pyglet.window.Window(resizable=True, caption="Graph Window", width=constants.WINDW, height=constants.WINDH)
     pyglet.clock.schedule(update)
 
@@ -304,7 +305,7 @@ def run():
         if symbol == key.DOWN:
             update.downHeld = True
         if symbol == key.RETURN:
-            drawText(viewGraph)
+            drawText(graphs)
 
     @window.event
     def on_key_release(symbol, modifiers):
@@ -337,7 +338,7 @@ def run():
         glClearColor(1, 1, 1, 1)
         window.clear()
 
-        glLineWidth(2.5)
+        glLineWidth(2.8)
         glEnable(GL_LINE_SMOOTH)
 
         drawAxes(axisView)

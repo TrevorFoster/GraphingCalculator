@@ -12,7 +12,8 @@ def readEquation(func, var=None):
 
     try:
         y = eval(func, {"__builtins__": None}, bindings)
-        if var != None: 
+
+        if var != None:
             del bindings[var[0]]
         return y
     except Exception as e:
@@ -37,20 +38,3 @@ bindings["min"] = min
 bindings["max"] = max
 bindings["pi"] = pi
 bindings["e"] = e
-
-def testReadEquation():
-    if readEquation("7+3") != 10:
-        print "** testSafeEval failed **"
-        return False
-    else:
-        return True
-
-def testReadEquation2():
-    if readEquation("8(+") != None:
-        print "** testReadEquation2 failed **"
-        return False
-    else:
-        return True
-
-assert testReadEquation()
-assert testReadEquation2()
