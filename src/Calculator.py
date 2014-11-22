@@ -4,28 +4,30 @@ from Tkinter import *
 import ttk, os, MathCalc, subprocess, Graphing, GraphUtils, CLineReadFile, UnitTests
 from platform import system
 
-def createGraphProcess():
-    global graphProcess, fList
-
+def createGraphProcess(functions, domain, gRange):
     # Format the expressions so they are ready to be graphed
-    funcArg = [element[6].get() for element in fList]
-    funcArg = [GraphUtils.formatExpression(f) for f in funcArg]
+    funcArg = [GraphUtils.formatExpression(f) for f in functions]
     funcArg = GraphUtils.replaceCalls(funcArg)
     funcArg = [GraphUtils.nestFunctions(e[1], funcArg[:e[0]] + funcArg[e[0] + 1:]) for e in enumerate(funcArg)]
 
     # Open the graphing subprocess
-    graphProcess = subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + ["%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())])
+    return subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + [domain,gRange])
     
 def startGraphing():
+    global graphProcess, fList
+
+    funcArg = [element[6].get() for element in fList]
+    domain, gRange = "%s,%s" % (lowerX.get(), upperX.get()), "%s,%s" % (lowerY.get(), upperY.get())
+
     if graphProcess != None:
         if graphProcess.poll() == None:
             # Terminate previous graphing process
             graphProcess.terminate()
-            createGraphProcess()
+            graphProcess = createGraphProcess(funcArg, domain, gRange)
         else:
-            createGraphProcess()
+            graphProcess = createGraphProcess(funcArg, domain, gRange)
     else:
-        createGraphProcess()
+        graphProcess = createGraphProcess(funcArg, domain, gRange)
     
 def equationChanged(stuff, var, resultString, resultLabel, num):
     global fList
@@ -104,7 +106,7 @@ def addToFuncList(*args):
     fEntry.bind("<Return>", addToFuncList)
     fEntry.bind("<BackSpace>", lambda event: backSpaceEntry(event, fNum - 1))
 
-    removeButton = ttk.Button(single, width=2, text="X", command=lambda: removeFuncEntry(fNum - 1))
+    removeButton = ttk.Button(single, width=2, text="⨉", command=lambda: removeFuncEntry(fNum - 1))
     removeButton.grid(row=fNum, column=2, pady=2)
 
     resultLabel.grid_forget()
@@ -143,23 +145,23 @@ def removeFuncEntry(fN):
     fList[fN - 1][1].focus_set()
     lastSelected = fList[fN - 1][1]
 
+# Event handler to evaluate new input to domain
+# and range entry boxes.
 def validateInput(action, text):
     if action == "0" or text in "0123456789.+-" or re.match(floatPattern, text):
         return True
     return False
 
-#def testValidateInput():  **Testing function for the validateInput method, not quite sure where re or floatPattern are defined so i left them out** 
-#   action = "1"
-#   text = "1"
-#   boo = True
-#   boo = validateInput(action, text)
-#   print boo
-
 def doGUI():
     global root, domainSet, floatPattern, graphProcess, equation, resultBox, \
         lowerX, upperX, lowerY, upperY, fList, funcFrame, eqFont, lastSelected
 
-    buttons = [["7", "8", "9", "/"],
+    buttons = [["7", "8", "9", "÷"],
+               ["4", "5", "6", "⨯"],
+               ["1", "2", "3", "-"],
+               ["0", ".", "=", "+"]]
+
+    charMap = [["7", "8", "9", "/"],
                ["4", "5", "6", "*"],
                ["1", "2", "3", "-"],
                ["0", ".", "=", "+"]]
@@ -176,7 +178,7 @@ def doGUI():
     root.minsize(720, 350)
     root.wm_title("Graphing Calculator")
 
-    # 
+    # Pattern to match floats
     floatPattern = r"(\-|\+)?[0-9]+(\.[0-9]*)?"
 
     s = ttk.Style()
@@ -229,7 +231,7 @@ def doGUI():
         for j in xrange(len(buttons[i])):
             ttk.Button(
                 buttonFrame, width=6, text=buttons[i][j],
-                command=lambda r=i, c=j: numPadClicked(buttons[r][c])
+                command=lambda r=i, c=j: numPadClicked(charMap[r][c])
             ).grid(row=i, column=j, padx=2, pady=2)
     buttonFrame.pack(padx=4, pady=8)
 
@@ -306,17 +308,149 @@ def doGUI():
 
     root.mainloop()
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        try:
-            fileContents = CLineReadFile.readFile(sys.argv[1])
-        except:
-            print "File not found."
-            sys.exit(0)
-        expressions = CLineReadFile.parseContents(fileContents)
-        results = CLineReadFile.evalExpressions(expressions)
-        CLineReadFile.printResults(results)
+def textInterface():
+    def inputExpression():
+        while 1:
+            while 1:
+                print "\nPlease enter expression to evaluate [OR] q to return to the main menu"
+                expression = raw_input(">> ").strip()
+                if not expression:
+                    continue
+                break
 
+            if expression.lower() == "q":
+                return None
+
+            formatted = GraphUtils.formatExpression(expression)
+            if not GraphUtils.validateFunction(formatted):
+                print "The expression entered has unmatched brackets.\nPlease try again.\n"
+                continue
+            return expression
+
+    options = ["Evaluate an expression", "Set domain and range", "View a function in text",
+                "View a function in the graph window", "Perform calculations from a text file",
+                "Exit the program"]
+    domain, rnge = [-10, 10], [-7.5, 7.5]
+    # Pattern to match floats
+    floatPattern = r"(\-|\+)?[0-9]+(\.[0-9]*)?"
+
+    currentDom, currentRange = "%s,%s" % (str(domain[0]), str(domain[1])), "%s,%s" % (str(rnge[0]), str(rnge[1]))
+    graphProcess = None
+    running = True
+    while running:
+        print "What would you like to do?"
+        for i, option in enumerate(options):
+            print "  %d. %s" % (i + 1, option)
+
+        choice = raw_input(">> ")
+        if choice == "1":
+            expression = inputExpression()
+            if expression == None:
+                continue
+            formatted = GraphUtils.formatExpression(expression)
+            result = MathCalc.readEquation(formatted)
+            if result == None:
+                print "\nSorry the expression was not evaluated successfully.\n"
+            else:
+                print "\nResult: %s\n" % str(result)
+
+        elif choice == "2":
+            print "\nCurrent domain and range:"
+            print "%s <= x <= %s  %s <= y <= %s\n" % (str(domain[0]), str(domain[1]), str(rnge[0]), str(rnge[1]))
+
+            while 1:
+                print "Please input the domain [OR] nothing to not alter it"
+                print "Format: 'lowerX,upperX'"
+                inp = raw_input(">> ").strip()
+                if not inp: break
+
+                match = re.search(r"(%s) *\, *(%s)" % (floatPattern, floatPattern), inp)
+                if match == None:
+                    print "Invalid input please try again.\n"
+                    continue
+
+                domain = map(lambda s: float(s.strip()), match.group().split(","))
+                currentDom = "%s,%s" % (str(domain[0]), str(domain[1]))
+                break
+            print
+
+            while 1:
+                print "Please input the range [OR] nothing to not alter it"
+                print "Format: 'lowerY,upperY'"
+                inp = raw_input(">> ").strip()
+                if not inp: break
+
+                match = re.search(r"(%s) *\, *(%s)" % (floatPattern, floatPattern), inp)
+                if match == None:
+                    print "Invalid input please try again.\n"
+                    continue
+                    
+                rnge = map(lambda s: float(s.strip()), match.group().split(","))
+                currentRange = "%s,%s" % (str(rnge[0]), str(rnge[1]))
+                break
+            print
+
+        elif choice == "3":
+            expression = inputExpression()
+            if not expression:
+                continue
+                
+            expression = GraphUtils.formatExpression(expression)
+            Graphing.commandLineDraw(expression, domain, rnge)
+
+        elif choice == "4":
+            expression = inputExpression()
+            if expression == None:
+                continue
+
+            if graphProcess != None:
+                if graphProcess.poll() == None:
+                    # Terminate previous graphing process
+                    graphProcess.terminate()
+                    graphProcess = createGraphProcess([expression], currentDom, currentRange)
+                else:
+                    graphProcess = createGraphProcess([expression], currentDom, currentRange)
+            else:
+                graphProcess = createGraphProcess([expression], currentDom, currentRange)
+            print
+        elif choice == "5":
+            print
+            while 1:
+                print "Please input the path to the file [OR] q to return to the main menu"
+                inp = raw_input(">> ")
+                if inp.lower() == "q":
+                    break
+                try:
+                    fileContents = CLineReadFile.readFile(inp)
+                except:
+                    print "Sorry", inp, "cannot be found or opened.\n"
+                    continue
+                expressions = CLineReadFile.parseContents(fileContents)
+                results = CLineReadFile.evalExpressions(expressions)
+                print "============Results============"
+                CLineReadFile.printResults(results)
+                break
+            print
+
+        elif choice == "6":
+            print "Goodbye!"
+            running = False
+
+if __name__ == "__main__":
+    args = len(sys.argv)
+    if args > 1:
+        option = sys.argv[1].lower()
+        if option == "cmd":
+            textInterface()
+        elif args == 3 and option == "file":
+            try:
+                fileContents = CLineReadFile.readFile(sys.argv[2])
+            except:
+                print "File not found."
+                sys.exit(0)
+            expressions = CLineReadFile.parseContents(fileContents)
+            results = CLineReadFile.evalExpressions(expressions)
+            CLineReadFile.printResults(results)
     else: 
         doGUI()
 

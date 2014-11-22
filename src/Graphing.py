@@ -74,7 +74,7 @@ def traceRange(func, grange, center, zoom):
 def drawGraph(coords, colour):
     pyglet.graphics.draw(len(coords) / 2, pyglet.gl.GL_LINE_STRIP,
         ('v2f', coords),
-        ('c4f', constants.CVECTORS[colour][:len(coords) * 2])
+        ('c4f', constants.PRECOLOURS[colour] * (len(coords)/2))
     )
     
 # Draws both the x and y axes centered around center
@@ -94,18 +94,49 @@ def drawAxes(center):
     )
 
 def drawText(graphs):
+    global axisCenter,camView
     dim = [xrange(60), xrange(18)]
     realGraph = []
 
-    for graph in graphs:
-        realGraph += map(lambda p: [int(p[0] / zoom[0]), int(p[1] / zoom[1])], zip(graph[0::2], graph[1::2]))
+    for graph in graphs: 
+        realGraph += map(lambda p: [int(p[0]), 18 - int(p[1])], zip(graph[0::2], graph[1::2]))
+    
+    xPos, yPos = int(axisView[0] / zoom[0]), int(axisView[1] / zoom[1])
+    for y in dim[1]:
+        realGraph.append([xPos, y])
+    for x in dim[0]:
+        realGraph.append([x, yPos])
 
-    result = "\n".join(
-        map(lambda row: "".join(row),
-             [map(lambda x: "*" if [x, y] in realGraph else " ", dim[0]) for y in dim[1]])
-        )
+    textGraph = []
+    for y in dim[1]:
+        row = ""
+        for x in dim[0]:
+            if [x, y] in realGraph:
+                row += "*"
+            else:
+                row += " "
+        textGraph.append(row)
 
-    print result
+    print "\n".join(textGraph)
+
+def commandLineDraw(func, domain, rnge):
+    global zoom, camView, axisCenter, axisView
+
+    constants()
+    constants.WINDW, constants.WINDH = 60, 18
+    zoom, camView = [1, 1], (0, 0)
+    axisCenter = (constants.WINDW / 2, constants.WINDH / 2)
+    
+    chooseDomain(domain[0], domain[1])
+    chooseRange(rnge[0], rnge[1])
+
+    axisView = [axisCenter[0] - camView[0],
+                     axisCenter[1] - camView[1]]
+
+    graph = updateGraph(func)
+    zoom[0] = 1
+    zoom[1] = 1
+    drawText([graph])
 
 def fixScale():
     global zoom, camView
@@ -281,7 +312,6 @@ def run():
             boundsX = map(lambda i: float(i), sys.argv[2 + funcs].split(","))
 
         if len(sys.argv) > 3 + funcs:
-            print sys.argv[3]
             boundsY = map(lambda i: float(i), sys.argv[3 + funcs].split(","))
 
     update.upHeld = False
@@ -290,7 +320,6 @@ def run():
     # View user defined domain and range
     chooseDomain(boundsX[0], boundsX[1])
     chooseRange(boundsY[0], boundsY[1])
-    fixScale()
 
     update.needsUpdate = True
 
@@ -304,8 +333,6 @@ def run():
             update.upHeld = True
         if symbol == key.DOWN:
             update.downHeld = True
-        if symbol == key.RETURN:
-            drawText(graphs)
 
     @window.event
     def on_key_release(symbol, modifiers):

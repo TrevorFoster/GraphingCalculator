@@ -14,9 +14,9 @@ def formatExpression(func):
     # Attempts to format multiplication in the expression properly
     # so that it may be successfully evaluated
     def fixMultiplication(func):
-        result = re.sub(r"(\b[0-9]+(?:\.[0-9]+)?) *([A-Za-z]+)", lambda match: "%s*%s" % (match.group(1), match.group(2)), func)
+        result = re.sub(r"(\b(?:\-|\+)?[0-9]+(?:\.[0-9]+)?) *([A-Za-z]+)", lambda match: "%s*%s" % (match.group(1), match.group(2)), func)
         result = re.sub(r"(\)) *([\w(])", lambda match: "%s*%s" % (match.group(1), match.group(2)), result)
-        result = re.sub(r"((?:\b[0-9]+(?:\.[0-9]+)?))(\()",
+        result = re.sub(r"(\b(?:\-|\+)?[0-9]+(?:\.[0-9]+)?)(\()",
                     lambda match: ("%s%s" if match.group(1) in funcList else "%s*%s") % (match.group(1), match.group(2)), result)
 
         fixed, last = "", 0
