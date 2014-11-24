@@ -42,9 +42,12 @@ def traceDomain(func, domain, center, zoom):
     global camView
     graph = []
 
+    # Find the independant variable in function
     ind = GraphUtils.findIndependent(func)
     if ind != None:
         ind = ind[0]
+
+    # Evaluate function for every x in domain
     for x in domain:
         x /= zoom[0]
         y = MathCalc.readEquation(func, (ind, x))
@@ -58,9 +61,12 @@ def traceRange(func, grange, center, zoom):
     global camView
     graph = []
 
+    # Find the independant variable in funciton
     ind = GraphUtils.findIndependent(func)
     if ind != None:
         ind = ind[0]
+
+    # Evaluate function for every y in range
     for y in grange:
         y /= zoom[1]
         x = MathCalc.readEquation(func, (ind, y))
@@ -82,12 +88,13 @@ def drawAxes(center):
     # Offset center y by OpenGL draw origin
     center = (float(center[0]), constants.WINDH - float(center[1]))
 
+    # Draw x-axis
     pyglet.graphics.draw(2, pyglet.gl.GL_LINES,
         ('v2f', (0, center[1], constants.WINDW, center[1])),
         ('c4f', (0.196078431, 0.196078431, 0.196078431, 0, 0.196078431, 0.196078431, 0.196078431, 0))
     )
     
-
+    # Draw y-axis
     pyglet.graphics.draw(2, pyglet.gl.GL_LINES,
         ('v2f', (center[0], constants.WINDH, center[0], 0)),
         ('c4f', (0.196078431, 0.196078431, 0.196078431, 0, 0.196078431, 0.196078431, 0.196078431, 0))
@@ -98,15 +105,18 @@ def drawText(graphs):
     dim = [xrange(60), xrange(18)]
     realGraph = []
 
+    # Flip y values
     for graph in graphs: 
         realGraph += map(lambda p: [int(p[0]), 18 - int(p[1])], zip(graph[0::2], graph[1::2]))
     
+    # Add coordinates of axes
     xPos, yPos = int(axisView[0] / zoom[0]), int(axisView[1] / zoom[1])
     for y in dim[1]:
         realGraph.append([xPos, y])
     for x in dim[0]:
         realGraph.append([x, yPos])
 
+    # Add points for each row of text graph
     textGraph = []
     for y in dim[1]:
         row = ""
@@ -123,19 +133,24 @@ def commandLineDraw(func, domain, rnge):
     global zoom, camView, axisCenter, axisView
 
     constants()
+    # Bind window size to size of text output
     constants.WINDW, constants.WINDH = 60, 18
     zoom, camView = [1, 1], (0, 0)
     axisCenter = (constants.WINDW / 2, constants.WINDH / 2)
     
+    # Update domain and range
     chooseDomain(domain[0], domain[1])
     chooseRange(rnge[0], rnge[1])
 
     axisView = [axisCenter[0] - camView[0],
                      axisCenter[1] - camView[1]]
 
+    # Trace the function
     graph = updateGraph(func)
     zoom[0] = 1
     zoom[1] = 1
+
+    # Output the graph
     drawText([graph])
 
 def fixScale():
@@ -152,6 +167,7 @@ def chooseDomain(lower, upper):
     if boundLength == 0:
         return
 
+    # Update zoom for new domain and move bounds into view
     zoom[0] = float(constants.WINDW) / boundLength
     camView = (lower * zoom[0] + constants.WINDW / 2.0, camView[1])
 
@@ -164,6 +180,7 @@ def chooseRange(lower, upper):
     if boundLength == 0:
         return
 
+    # Update zoom fro new range and move bounds into view
     zoom[1] = float(constants.WINDH) / boundLength
     camView = (camView[0], -(upper * zoom[1] - constants.WINDH / 2.0))
 
@@ -172,21 +189,28 @@ def chooseRange(lower, upper):
 def graphDomain(func):
     global camView, zoom, axisCenter
 
+    # Calculate step between points
     step = float(constants.WINDW) / (constants.SIGPOINTS / 2.0)
 
+    # Create domain
     domain = GraphUtils.frange((-(constants.WINDW / 2.0) + camView[0]) - 1,
             (constants.WINDW / 2.0 + camView[0]) + 1, step)
 
+    # Trace domain
     viewGraph = traceDomain(GraphUtils.removeDependant(func), domain, axisCenter, zoom)
     return viewGraph
 
 def graphRange(func):
     global camView, zoom, axisCenter
 
+    # Calculate step between points
     step = float(constants.WINDH) / (constants.SIGPOINTS / 2.0)
+
+    # Create range
     grange = GraphUtils.frange((-(constants.WINDH / 2.0) - camView[1]) - 1,
             (constants.WINDH / 2.0 - camView[1]) + 1, step)
 
+    # Trace range
     viewGraph = traceRange(GraphUtils.removeDependant(func), grange, axisCenter, zoom)
     return viewGraph
 
