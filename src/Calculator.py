@@ -4,6 +4,7 @@ from Tkinter import *
 import ttk, os, MathCalc, subprocess, Graphing, GraphUtils, CLineReadFile, UnitTests
 from platform import system
 
+# Start the graphing process  
 def createGraphProcess(functions, domain, gRange):
     # Format the expressions so they are ready to be graphed
     funcArg = [GraphUtils.formatExpression(f) for f in functions]
@@ -11,8 +12,9 @@ def createGraphProcess(functions, domain, gRange):
     funcArg = [GraphUtils.nestFunctions(e[1], funcArg[:e[0]] + funcArg[e[0] + 1:]) for e in enumerate(funcArg)]
 
     # Open the graphing subprocess
-    return subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + [domain,gRange])
-    
+    return subprocess.Popen(["python-32", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + [domain,gRange])
+
+# Manage the graphing process creation
 def startGraphing():
     global graphProcess, fList
 
@@ -28,7 +30,8 @@ def startGraphing():
             graphProcess = createGraphProcess(funcArg, domain, gRange)
     else:
         graphProcess = createGraphProcess(funcArg, domain, gRange)
-    
+
+# Callback for when a entry box has been changed   
 def equationChanged(stuff, var, resultString, resultLabel, num):
     global fList
 
@@ -41,10 +44,12 @@ def equationChanged(stuff, var, resultString, resultLabel, num):
             frame = fList[i + rng[0]]
             eq = replaced[i]
 
+            # Calculate the result of the entered equation
             result = MathCalc.readEquation(GraphUtils.removeDependant(eq))
             resultType = type(result)
             types = [int, long, float]
 
+            # Display the result of calculation below the text box
             if resultType in types:
                 frame[7].set("= " + str(result))
                 frame[3].grid(columnspan=1000)
@@ -57,6 +62,7 @@ def equationChanged(stuff, var, resultString, resultLabel, num):
         index = int(num.get()[:-1]) - 1
         updateResults([index, index + 1])
 
+# Add num that was clicked to last selected entry
 def numPadClicked(button):
     global lastSelected
 
@@ -67,18 +73,26 @@ def numPadClicked(button):
             lastSelected.insert(INSERT, button)
         lastSelected.focus_set()
 
+# Add correct function to last selected entry
 def funcClicked(func):
     global lastSelected
 
     if lastSelected != None:
-        lastSelected.insert(INSERT, func + "()")
-        lastSelected.icursor(lastSelected.index(INSERT) - 1)
+        if func not in ("pi", "e"):
+            lastSelected.insert(INSERT, func + "()")
+            lastSelected.icursor(lastSelected.index(INSERT) - 1)
+        else:
+            lastSelected.insert(INSERT, func)
+            lastSelected.icursor(lastSelected.index(INSERT))
+        
         lastSelected.focus_set()
 
+# Update the last selected entry when one is clicked
 def entryClicked(event):
     global lastSelected
     lastSelected = event.widget
 
+# Event handler for backspace in function entry
 def backSpaceEntry(event, fN):
     if len(event.widget.get()) == 0:
         removeFuncEntry(fN)
@@ -90,6 +104,8 @@ def addToFuncList(*args):
     num = StringVar()
     
     single = ttk.Frame(funcFrame)
+
+    # Create leading label
     fLabel = ttk.Label(single, textvariable=num)
     fLabel.grid(row=fNum, column=0, pady=2, sticky=W)
     num.set("%d." % (fNum))
@@ -97,6 +113,7 @@ def addToFuncList(*args):
     resultString = StringVar()
     resultLabel = Label(single, textvariable=resultString)
 
+    # Create function entry text box
     eqString = StringVar()
     eqString.trace("w", lambda *args: equationChanged(args, eqString, resultString, resultLabel, num))
     fEntry = ttk.Entry(single, width=20, font=eqFont, textvariable=eqString)
@@ -106,6 +123,7 @@ def addToFuncList(*args):
     fEntry.bind("<Return>", addToFuncList)
     fEntry.bind("<BackSpace>", lambda event: backSpaceEntry(event, fNum - 1))
 
+    # Create the remove text box button
     removeButton = ttk.Button(single, width=2, text="⨉", command=lambda: removeFuncEntry(fNum - 1))
     removeButton.grid(row=fNum, column=2, pady=2)
 
@@ -116,6 +134,7 @@ def addToFuncList(*args):
     fEntry.focus_set()
     lastSelected = fEntry
 
+    # Add the new function entry to fList
     fList.append((fLabel, fEntry, removeButton, resultLabel, single, num, eqString, resultString))
 
 def removeFuncEntry(fN):
@@ -161,18 +180,23 @@ def doGUI():
                ["1", "2", "3", "-"],
                ["0", ".", "=", "+"]]
 
+    # Characters that are added instead of face char
     charMap = [["7", "8", "9", "/"],
                ["4", "5", "6", "*"],
                ["1", "2", "3", "-"],
                ["0", ".", "=", "+"]]
 
+    # Faces for trig buttons
     trig = [["sin", "arcsin", "sinh"],
             ["cos", "arccos", "cosh"],
-            ["tan", "arctan", "tanh"]]
+            ["tan", "arctan", "tanh"],
+            ["pi"]]
 
+    # Faces for misc buttons
     funcs = [["ln", "log", "log10"],
              ["sqrt", "ceil", "floor"],
-             ["abs", "min", "max"]]
+             ["abs", "min", "max"],
+             ["e"]]
 
     root = Tk()
     root.minsize(720, 350)
@@ -244,6 +268,7 @@ def doGUI():
     # Tab for misc functions
     miscFrame = ttk.Frame(tabs)
 
+    # Layout for trig tab
     for i in xrange(len(trig)):
         for j in xrange(len(trig[i])):
             ttk.Button(
@@ -252,6 +277,7 @@ def doGUI():
             ).grid(row=i, column=j, padx=2, pady=2)
     trigFrame.pack()
 
+    # Layout for misc tab
     for i in xrange(len(funcs)):
         for j in xrange(len(funcs[i])):
             ttk.Button(
@@ -268,6 +294,7 @@ def doGUI():
     xLow, xHigh = StringVar(), StringVar()
     yLow, yHigh = StringVar(), StringVar()
 
+    # Give some initial values to domain and range
     xLow.set("-10")
     xHigh.set("10")
     yLow.set("-7.5")
@@ -275,12 +302,14 @@ def doGUI():
 
     restrictionFrame = ttk.Frame(rightFrame, borderwidth=4, relief=GROOVE)
 
+    # Layout for domain entry
     domLabel = ttk.Label(restrictionFrame, text="Domain")
     domFrame = ttk.Frame(restrictionFrame, borderwidth=4, relief=GROOVE)
     lowerX = ttk.Entry(domFrame, width=8, textvariable=xLow, validate="key", validatecommand=vcmd)
     domNotation = ttk.Label(domFrame, text="≤ x ≤")
     upperX = ttk.Entry(domFrame, width=8, textvariable=xHigh, validate="key", validatecommand=vcmd)
 
+    # Layout for range entry
     rangeLabel = ttk.Label(restrictionFrame, text="Range")
     rngFrame = ttk.Frame(restrictionFrame, borderwidth=4, relief=GROOVE)
     lowerY = ttk.Entry(rngFrame, width=8, textvariable=yLow, validate="key", validatecommand=vcmd)
@@ -308,7 +337,9 @@ def doGUI():
 
     root.mainloop()
 
+# Display interactable text interface
 def textInterface():
+    # Get user input for expression
     def inputExpression():
         while 1:
             while 1:
@@ -327,10 +358,13 @@ def textInterface():
                 continue
             return expression
 
+    # Menu options
     options = ["Evaluate an expression", "Set domain and range", "View a function in text",
                 "View a function in the graph window", "Perform calculations from a text file",
                 "Exit the program"]
+    
     domain, rnge = [-10, 10], [-7.5, 7.5]
+    
     # Pattern to match floats
     floatPattern = r"(\-|\+)?[0-9]+(\.[0-9]*)?"
 
@@ -338,6 +372,7 @@ def textInterface():
     graphProcess = None
     running = True
     while running:
+        # Display options to the user
         print "What would you like to do?"
         for i, option in enumerate(options):
             print "  %d. %s" % (i + 1, option)
@@ -355,15 +390,18 @@ def textInterface():
                 print "\nResult: %s\n" % str(result)
 
         elif choice == "2":
+            # Display the current domain and range to user
             print "\nCurrent domain and range:"
             print "%s <= x <= %s  %s <= y <= %s\n" % (str(domain[0]), str(domain[1]), str(rnge[0]), str(rnge[1]))
 
+            # Domain entry
             while 1:
                 print "Please input the domain [OR] nothing to not alter it"
                 print "Format: 'lowerX,upperX'"
                 inp = raw_input(">> ").strip()
                 if not inp: break
 
+                # Match the user entered domain
                 match = re.search(r"(%s) *\, *(%s)" % (floatPattern, floatPattern), inp)
                 if match == None:
                     print "Invalid input please try again.\n"
@@ -374,12 +412,14 @@ def textInterface():
                 break
             print
 
+            # Range entry
             while 1:
                 print "Please input the range [OR] nothing to not alter it"
                 print "Format: 'lowerY,upperY'"
                 inp = raw_input(">> ").strip()
                 if not inp: break
 
+                # Match the user entered range
                 match = re.search(r"(%s) *\, *(%s)" % (floatPattern, floatPattern), inp)
                 if match == None:
                     print "Invalid input please try again.\n"
@@ -394,7 +434,8 @@ def textInterface():
             expression = inputExpression()
             if not expression:
                 continue
-                
+            
+            # Format the entered expression and draw the text graph
             expression = GraphUtils.formatExpression(expression)
             Graphing.commandLineDraw(expression, domain, rnge)
 
@@ -427,6 +468,8 @@ def textInterface():
                     continue
                 expressions = CLineReadFile.parseContents(fileContents)
                 results = CLineReadFile.evalExpressions(expressions)
+
+                # Display results
                 print "============Results============"
                 CLineReadFile.printResults(results)
                 break
@@ -440,9 +483,9 @@ if __name__ == "__main__":
     args = len(sys.argv)
     if args > 1:
         option = sys.argv[1].lower()
-        if option == "cmd":
+        if option == "cmd":                     # Start text interface
             textInterface()
-        elif args == 3 and option == "file":
+        elif args == 3 and option == "file":    # Evaluate expressions in file
             try:
                 fileContents = CLineReadFile.readFile(sys.argv[2])
             except:
@@ -451,7 +494,8 @@ if __name__ == "__main__":
             expressions = CLineReadFile.parseContents(fileContents)
             results = CLineReadFile.evalExpressions(expressions)
             CLineReadFile.printResults(results)
-    else: 
+    else:                                       # Start graphical user interface
         doGUI()
 
+    # Run unit tests
     assert UnitTests.unitTest()
