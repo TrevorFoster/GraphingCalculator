@@ -153,13 +153,6 @@ def commandLineDraw(func, domain, rnge):
     # Output the graph
     drawText([graph])
 
-def fixScale():
-    global zoom, camView
-
-    # Equalize zoomY and zoomX for square view
-    zoom[1] = zoom[0]
-    update.needsUpdate = True
-
 def chooseDomain(lower, upper):
     global zoom, camView
 

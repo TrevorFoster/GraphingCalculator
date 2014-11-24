@@ -207,7 +207,4 @@ def validateFunction(func):
 
 FUNCREGEX = r"(?i)(%s)" % "|".join(funcList)
 userFuncMapings = {}
-#defineFunctions(["a(x1,x2) = sin(x1) - cos(x2)"])
-#print replaceCalls(["a(2,4)"])
-#defineFunctions(["a(x1, x2) = b(3sin(x1), 2cos(x2), x3)", "b(theta1, x1, theta2) = sqrt(theta1, x1, theta2)"])
-#print replaceCalls(["a(sin(x), cos(x)) - a(2, 4)"])
+
