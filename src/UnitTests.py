@@ -1,3 +1,4 @@
+#!/usr/bin/python
 from GraphUtils import*
 from MathCalc import*
 from CLineReadFile import*
@@ -80,7 +81,7 @@ def testEvalExpressions():
         return True
 
 def readFileTest():
-    if readFile(relativePath(sys.path[0], 1, "/testFile.txt")) != "2+4\n2*sin(pi/2)\n1+1":
+    if readFile(relativePath(sys.path[0], 1, "/res/testFile.txt")) != "2+4\n2*sin(pi/2)\n1+1":
         print "**readFile failed**"
         return False
     else:

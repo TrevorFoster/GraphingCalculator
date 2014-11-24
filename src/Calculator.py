@@ -12,7 +12,7 @@ def createGraphProcess(functions, domain, gRange):
     funcArg = [GraphUtils.nestFunctions(e[1], funcArg[:e[0]] + funcArg[e[0] + 1:]) for e in enumerate(funcArg)]
 
     # Open the graphing subprocess
-    return subprocess.Popen(["python-32", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + [domain,gRange])
+    return subprocess.Popen(["python", sys.path[1] + "/Graphing.py", str(len(funcArg))] + funcArg + [domain,gRange])
 
 # Manage the graphing process creation
 def startGraphing():
@@ -377,7 +377,7 @@ def textInterface():
         for i, option in enumerate(options):
             print "  %d. %s" % (i + 1, option)
 
-        choice = raw_input(">> ")
+        choice = raw_input(">> ").strip()
         if choice == "1":
             expression = inputExpression()
             if expression == None:
